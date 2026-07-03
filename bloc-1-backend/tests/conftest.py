@@ -1,0 +1,64 @@
+import pytest
+from fastapi.testclient import TestClient
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+
+from app.db import get_db
+from app.main import app
+from app.models import Base
+
+TEST_DATABASE_URL = "sqlite:///./data/test_saas_rse.db"
+
+engine = create_engine(
+    TEST_DATABASE_URL,
+    connect_args={"check_same_thread": False},
+)
+TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+
+@pytest.fixture(autouse=True)
+def setup_db():
+    Base.metadata.create_all(bind=engine)
+    yield
+    Base.metadata.drop_all(bind=engine)
+
+
+@pytest.fixture
+def db():
+    session = TestingSessionLocal()
+    try:
+        yield session
+    finally:
+        session.close()
+
+
+@pytest.fixture
+def client(db):
+    def override_get_db():
+        try:
+            yield db
+        finally:
+            pass
+
+    app.dependency_overrides[get_db] = override_get_db
+    with TestClient(app) as c:
+        yield c
+    app.dependency_overrides.clear()
+
+
+@pytest.fixture
+def persona_payload():
+    return {
+        "bu": "noisyless",
+        "nom": "Propriétaire Airbnb stressé par le bruit",
+        "besoins": "Trouver des solutions concrètes pour réduire les nuisances sonores",
+        "frustrations": "Locataires qui se plaignent, notes 4 étoiles au lieu de 5",
+        "cible": "Propriétaires de locations courte durée en France",
+        "charte_branding": {
+            "ton": "professional_warm",
+            "mots_interdits": ["cheap", "disrupt"],
+            "emojis_autorises": ["✅", "🔧"],
+            "structure_phrases": "courtes, max 20 mots",
+            "longueur_cible": 1500,
+        },
+    }

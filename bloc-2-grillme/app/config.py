@@ -8,9 +8,10 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     app_env: str = "development"
 
-    deepseek_api_key: str = "sk-placeholder"
-    deepseek_base_url: str = "https://api.deepseek.com/v1"
-    deepseek_model: str = "deepseek-chat"
+    # Ollama expose une API OpenAI-compatible sur :11434/v1
+    deepseek_api_key: str = "ollama"
+    deepseek_base_url: str = "http://localhost:11434/v1"
+    deepseek_model: str = "deepseek-v4-flash:cloud"
 
 
 settings = Settings()

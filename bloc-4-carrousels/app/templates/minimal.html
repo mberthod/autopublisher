@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    width: {{ width }}px;
+    height: {{ height }}px;
+    font-family: system-ui, -apple-system, sans-serif;
+    background: {{ slide.background_color }};
+    color: {{ slide.text_color }};
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .inner {
+    width: 780px;
+    text-align: center;
+  }
+  .index {
+    font-size: 12px;
+    letter-spacing: 6px;
+    text-transform: uppercase;
+    opacity: 0.25;
+    margin-bottom: 64px;
+  }
+  .line {
+    width: 1px;
+    height: 80px;
+    background: currentColor;
+    opacity: 0.15;
+    margin: 0 auto 64px;
+  }
+  .title {
+    font-size: 72px;
+    font-weight: 300;
+    line-height: 1.1;
+    letter-spacing: -3px;
+    margin-bottom: 48px;
+  }
+  .body {
+    font-size: 28px;
+    font-weight: 300;
+    line-height: 1.8;
+    opacity: 0.6;
+    letter-spacing: 0.2px;
+  }
+  .bu-tag {
+    margin-top: 80px;
+    font-size: 11px;
+    letter-spacing: 5px;
+    text-transform: uppercase;
+    opacity: 0.2;
+  }
+</style>
+</head>
+<body>
+  <div class="inner">
+    <div class="index">{{ slide.index + 1 }} — {{ total }}</div>
+    <div class="line"></div>
+    {% if slide.title %}
+    <div class="title">{{ slide.title }}</div>
+    {% endif %}
+    <div class="body">{{ slide.body }}</div>
+    <div class="bu-tag">{{ bu }}</div>
+  </div>
+</body>
+</html>

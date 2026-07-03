@@ -1,0 +1,27 @@
+{
+  "bu": "noisyless",
+  "theme": "modern",
+  "slides": [
+    {
+      "index": 0,
+      "title": "Le silence est un avantage",
+      "body": "Dans un monde bruyant, la discrétion devient un super-pouvoir.",
+      "background_color": "#0D0D0D",
+      "text_color": "#F5F5F5"
+    },
+    {
+      "index": 1,
+      "title": "3 raisons de choisir le calme",
+      "body": "Concentration. Créativité. Clarté. Tout commence par réduire le bruit ambiant.",
+      "background_color": "#0D0D0D",
+      "text_color": "#F5F5F5"
+    },
+    {
+      "index": 2,
+      "title": "Passez à l'action",
+      "body": "Découvrez notre gamme de solutions acoustiques pensées pour les espaces de travail modernes.",
+      "background_color": "#0D0D0D",
+      "text_color": "#F5F5F5"
+    }
+  ]
+}

@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <link rel="stylesheet" href="popup.css">
+  <title>SaaS RSE Publisher</title>
+</head>
+<body>
+  <div class="header">
+    <span class="logo">RSE</span>
+    <span class="title">Publisher</span>
+  </div>
+
+  <div class="stats">
+    <div class="stat">
+      <div class="stat-value" id="stat-pending">—</div>
+      <div class="stat-label">en attente</div>
+    </div>
+    <div class="stat">
+      <div class="stat-value" id="stat-running">—</div>
+      <div class="stat-label">en cours</div>
+    </div>
+    <div class="stat">
+      <div class="stat-value" id="stat-done">—</div>
+      <div class="stat-label">publiés</div>
+    </div>
+    <div class="stat">
+      <div class="stat-value" id="stat-failed">—</div>
+      <div class="stat-label">échecs</div>
+    </div>
+  </div>
+
+  <div class="last-task" id="last-task">Aucune tâche récente.</div>
+
+  <div class="actions">
+    <button id="btn-poll" class="btn-primary">Vérifier maintenant</button>
+    <button id="btn-settings" class="btn-secondary">Paramètres</button>
+  </div>
+
+  <div class="settings-panel hidden" id="settings-panel">
+    <label for="backend-url">URL backend</label>
+    <input id="backend-url" type="text" placeholder="http://192.168.0.176:8000" />
+    <button id="btn-save" class="btn-primary">Sauvegarder</button>
+  </div>
+
+  <script type="module" src="popup.js"></script>
+</body>
+</html>

@@ -18,11 +18,12 @@ def create_post(data: PostCreate, db: Session = Depends(get_db)):
 @router.get("", response_model=list[PostRead])
 def list_posts(
     skip: int = 0,
-    limit: int = 100,
+    limit: int = 200,
     status: Optional[str] = Query(None),
     persona_id: Optional[str] = Query(None),
     planning_id: Optional[str] = Query(None),
     platform: Optional[str] = Query(None),
+    scheduled_for_date: Optional[str] = Query(None, description="Filter by date YYYY-MM-DD"),
     db: Session = Depends(get_db),
 ):
     return post_service.list_all(
@@ -33,6 +34,7 @@ def list_posts(
         persona_id=persona_id,
         planning_id=planning_id,
         platform=platform,
+        scheduled_for_date=scheduled_for_date,
     )
 
 

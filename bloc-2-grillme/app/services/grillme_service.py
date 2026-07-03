@@ -5,23 +5,39 @@ from fastapi import HTTPException
 from loguru import logger
 from sqlalchemy.orm import Session
 
-from app.agents.interrogator_agent import InterrogatorAgent, MATRIX_FIELDS
+from app.agents.interrogator_agent import InterrogatorAgent, MATRIX_FIELDS, FIELD_QUESTIONS
 from app.agents.strategist_agent import StrategistAgent
 from app.models import GrilledMeSession, Persona
 from app.services import persona_service
+
+
+def _next_field(matrix: dict) -> Optional[str]:
+    for f in MATRIX_FIELDS:
+        if not matrix.get(f):
+            return f
+    return None
+
+
+def _progress(matrix: dict) -> float:
+    filled = sum(1 for f in MATRIX_FIELDS if matrix.get(f))
+    return round(filled / len(MATRIX_FIELDS), 2)
 
 
 def start_session(db: Session, bu: str, interrogator: Optional[InterrogatorAgent] = None) -> tuple[str, str]:
     if interrogator is None:
         interrogator = InterrogatorAgent()
 
-    result = interrogator.start_session(bu)
-    first_question = result.get("next_question") or "Décrivez votre cible client idéale."
+    first_question = interrogator.get_first_question(bu)
 
     session = GrilledMeSession(
         bu=bu,
-        matrix=result.get("matrix_update", {}),
-        transcript=[{"role": "assistant", "content": first_question, "timestamp": datetime.utcnow().isoformat()}],
+        matrix={},
+        transcript=[{
+            "role": "assistant",
+            "content": first_question,
+            "field": "cible",
+            "timestamp": datetime.utcnow().isoformat(),
+        }],
         status="in_progress",
     )
     db.add(session)
@@ -49,25 +65,36 @@ def handle_message(
     if strategist is None:
         strategist = StrategistAgent()
 
-    logger.bind(session_id=session_id).info(f"Handling message: {user_message[:50]}")
-
+    matrix = dict(session.matrix)
     transcript = list(session.transcript)
+
+    # Determine which field the last assistant question was about
+    current_field = _next_field(matrix)
+    if not current_field:
+        raise HTTPException(status_code=400, detail="All fields already filled")
+
+    logger.bind(session_id=session_id, field=current_field).info(f"Handling message: {user_message[:50]}")
+
+    # Extract and store the value for the current field
+    value = interrogator.extract_field_value(session.bu, current_field, user_message)
+    matrix[current_field] = value
+
     transcript.append({"role": "user", "content": user_message, "timestamp": datetime.utcnow().isoformat()})
 
-    matrix = dict(session.matrix)
-    result = interrogator.process_message(session.bu, matrix, transcript, user_message)
+    # Determine next field
+    next_field = _next_field(matrix)
+    is_complete = next_field is None
+    progress = _progress(matrix)
 
-    matrix_update = result.get("matrix_update", {})
-    if isinstance(matrix_update, dict):
-        matrix.update(matrix_update)
-
-    next_question = result.get("next_question")
-    is_complete = result.get("is_complete", False)
-    progress = float(result.get("matrix_progress", _compute_progress(matrix)))
-    current_field = _get_current_field(matrix)
-
-    if next_question:
-        transcript.append({"role": "assistant", "content": next_question, "timestamp": datetime.utcnow().isoformat()})
+    next_question = None
+    if not is_complete:
+        next_question = FIELD_QUESTIONS[next_field]
+        transcript.append({
+            "role": "assistant",
+            "content": next_question,
+            "field": next_field,
+            "timestamp": datetime.utcnow().isoformat(),
+        })
 
     session.matrix = matrix
     session.transcript = transcript
@@ -112,15 +139,3 @@ def get_session_persona(db: Session, session_id: str) -> dict:
         raise HTTPException(status_code=404, detail="Persona not found")
 
     return {"persona": persona, "transcript": session.transcript}
-
-
-def _compute_progress(matrix: dict) -> float:
-    filled = sum(1 for f in MATRIX_FIELDS if matrix.get(f))
-    return round(filled / len(MATRIX_FIELDS), 2)
-
-
-def _get_current_field(matrix: dict) -> Optional[str]:
-    for field in MATRIX_FIELDS:
-        if not matrix.get(field):
-            return field
-    return None

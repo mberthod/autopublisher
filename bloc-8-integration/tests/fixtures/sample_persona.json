@@ -1,0 +1,13 @@
+{
+  "bu": "noisyless",
+  "nom": "Marie — Propriétaire location courte durée",
+  "besoins": "Maintenir une note Airbnb 4.8+, éviter les plaintes de voisins, gérer 3 appartements à distance",
+  "frustrations": "Plaintes récurrentes de bruit la nuit, demandes de remboursement des locataires, avis négatifs liés aux nuisances sonores",
+  "cible": "Propriétaires français de 1 à 5 biens en location courte durée, 35-55 ans, CSP+",
+  "charte_branding": {
+    "ton": "chaleureux mais expert, jamais vendeur ni condescendant",
+    "mots_interdits": ["cheap", "disruptif", "révolutionnaire", "innovant"],
+    "longueur_cible": 1500,
+    "emojis": ["🔧", "✅", "📊", "🏠"]
+  }
+}

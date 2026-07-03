@@ -1,0 +1,32 @@
+[project]
+name = "saas-rse-carrousels"
+version = "0.1.0"
+description = "Génération de carrousels PNG via Playwright + Jinja2"
+requires-python = ">=3.11,<3.13"
+dependencies = [
+  "playwright>=1.48,<2",
+  "jinja2>=3.1,<4",
+  "pydantic>=2.9,<3",
+  "pydantic-settings>=2.6,<3",
+  "loguru>=0.7,<1",
+  "Pillow>=10.4,<11",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.3,<9",
+  "pytest-asyncio>=0.24,<1",
+  "pytest-cov>=6.0,<7",
+]
+
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+pythonpath = ["."]

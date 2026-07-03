@@ -2,6 +2,7 @@ from typing import Optional
 
 from fastapi import HTTPException
 from loguru import logger
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.models import Post, Planning, Persona
@@ -31,11 +32,12 @@ def get_by_id(db: Session, post_id: str) -> Post:
 def list_all(
     db: Session,
     skip: int = 0,
-    limit: int = 100,
+    limit: int = 200,
     status: Optional[str] = None,
     persona_id: Optional[str] = None,
     planning_id: Optional[str] = None,
     platform: Optional[str] = None,
+    scheduled_for_date: Optional[str] = None,
 ) -> list[Post]:
     query = db.query(Post)
     if status:
@@ -46,6 +48,8 @@ def list_all(
         query = query.filter(Post.planning_id == planning_id)
     if platform:
         query = query.filter(Post.platform == platform)
+    if scheduled_for_date:
+        query = query.filter(func.date(Post.scheduled_for) == scheduled_for_date)
     return query.offset(skip).limit(limit).all()
 
 

@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    width: {{ width }}px;
+    height: {{ height }}px;
+    font-family: system-ui, -apple-system, sans-serif;
+    background: {{ slide.background_color }};
+    color: {{ slide.text_color }};
+    overflow: hidden;
+    position: relative;
+  }
+  .bg-num {
+    position: absolute;
+    top: -40px;
+    right: -20px;
+    font-size: 360px;
+    font-weight: 900;
+    opacity: 0.05;
+    line-height: 1;
+    pointer-events: none;
+    color: currentColor;
+  }
+  .content {
+    position: relative;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    padding: 80px;
+  }
+  .tag-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 32px;
+  }
+  .tag {
+    background: {{ slide.text_color }};
+    color: {{ slide.background_color }};
+    padding: 8px 18px;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+  }
+  .tag-line {
+    height: 2px;
+    flex: 1;
+    background: currentColor;
+    opacity: 0.2;
+  }
+  .title {
+    font-size: 80px;
+    font-weight: 900;
+    line-height: 0.95;
+    letter-spacing: -4px;
+    text-transform: uppercase;
+    margin-bottom: 40px;
+  }
+  .body {
+    font-size: 30px;
+    font-weight: 500;
+    line-height: 1.5;
+    opacity: 0.75;
+    max-width: 760px;
+  }
+</style>
+</head>
+<body>
+  <div class="bg-num">{{ slide.index + 1 }}</div>
+  <div class="content">
+    <div class="tag-row">
+      <div class="tag">{{ bu }}</div>
+      <div class="tag-line"></div>
+      <span style="font-size:13px;opacity:0.3;letter-spacing:2px;">{{ slide.index + 1 }}/{{ total }}</span>
+    </div>
+    {% if slide.title %}
+    <div class="title">{{ slide.title }}</div>
+    {% endif %}
+    <div class="body">{{ slide.body }}</div>
+  </div>
+</body>
+</html>

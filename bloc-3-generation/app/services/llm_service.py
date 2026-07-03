@@ -1,3 +1,5 @@
+import json
+import re
 from typing import Optional
 
 from loguru import logger
@@ -37,6 +39,17 @@ Longueur cible : {longueur} caractères.
 Format du post : {format}.
 
 Retourne UNIQUEMENT le texte du post, sans explication ni commentaire."""
+
+IDEAS_SYSTEM = """Tu es un stratège de contenu RSE expert pour {bu}.
+
+Cible : {cible}
+Besoins : {besoins}
+Frustrations : {frustrations}
+
+Génère des angles éditoriaux originaux, concrets et engageants.
+Réponds UNIQUEMENT avec ce JSON (rien d'autre, pas de markdown) :
+{{"ideas": [{{"angle": "titre accrocheur en 1 phrase percutante", "rationale": "pourquoi ça engage cette cible", "platform": "linkedin"}}]}}
+"""
 
 
 class LLMService:
@@ -88,3 +101,39 @@ class LLMService:
             "tokens_out": usage.completion_tokens if usage else 0,
             "model": self.model,
         }
+
+    def generate_ideas(self, persona: Persona, keywords: str, platform: str, n: int = 10) -> list[dict]:
+        system = IDEAS_SYSTEM.format(
+            bu=persona.bu,
+            cible=persona.cible,
+            besoins=persona.besoins,
+            frustrations=persona.frustrations,
+        )
+        plat_str = "LinkedIn ET Instagram" if platform == "both" else platform
+        user = (
+            f"Génère exactement {n} angles éditoriaux pour les mots-clés : {keywords}\n"
+            f"Adapte pour : {plat_str}\n"
+            f"Chaque angle doit être distinct, actionnable et parlant pour la cible.\n"
+            f"Retourne EXACTEMENT {n} idées dans le tableau JSON."
+        )
+        response = self._client.chat.completions.create(
+            model=self.model,
+            messages=[
+                {"role": "system", "content": system},
+                {"role": "user", "content": user},
+            ],
+            temperature=0.95,
+        )
+        raw = response.choices[0].message.content or ""
+        logger.bind(n=n, raw_len=len(raw)).info("LLM ideas generation done")
+        try:
+            data = json.loads(raw)
+        except Exception:
+            m = re.search(r'\{[\s\S]*\}', raw)
+            if not m:
+                return []
+            try:
+                data = json.loads(m.group())
+            except Exception:
+                return []
+        return data.get("ideas", [])

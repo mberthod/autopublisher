@@ -37,3 +37,18 @@ class PostRead(BaseModel):
     generation_metadata: Optional[dict]
     created_at: datetime
     updated_at: datetime
+
+
+class IdeaGenerateRequest(BaseModel):
+    persona_id: str
+    keywords: str
+    platform: Literal["linkedin", "instagram", "both"] = "both"
+    n: int = 10
+
+class EditorialIdea(BaseModel):
+    angle: str
+    rationale: str
+    platform: str
+
+class IdeaGenerateResponse(BaseModel):
+    ideas: list[EditorialIdea]

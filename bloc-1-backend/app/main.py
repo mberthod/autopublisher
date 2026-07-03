@@ -1,9 +1,11 @@
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
 
 from app.api import health_routes, persona_routes, planning_routes, post_routes
+from app.api import task_routes, selector_routes
 from app.config import settings
 from app.db import init_db
 
@@ -24,7 +26,21 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:5173",
+        "http://192.168.0.176:5173",
+        "http://127.0.0.1:5173",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 app.include_router(health_routes.router, tags=["health"])
 app.include_router(persona_routes.router, prefix="/api/v1/personas", tags=["personas"])
 app.include_router(planning_routes.router, prefix="/api/v1/plannings", tags=["plannings"])
 app.include_router(post_routes.router, prefix="/api/v1/posts", tags=["posts"])
+app.include_router(task_routes.router, prefix="/api/v1/tasks", tags=["tasks"])
+app.include_router(selector_routes.router, prefix="/api/v1/selectors", tags=["selectors"])

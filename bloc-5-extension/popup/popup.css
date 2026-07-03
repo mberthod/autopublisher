@@ -1,0 +1,76 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  width: 280px;
+  font-family: system-ui, -apple-system, sans-serif;
+  font-size: 13px;
+  color: #1a1a1a;
+  background: #fff;
+}
+.header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 16px 12px;
+  border-bottom: 1px solid #eee;
+}
+.logo {
+  background: #6C63FF;
+  color: #fff;
+  font-weight: 800;
+  font-size: 11px;
+  letter-spacing: 1px;
+  padding: 3px 7px;
+  border-radius: 4px;
+}
+.title { font-weight: 600; font-size: 14px; }
+.stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  padding: 12px 8px;
+  gap: 4px;
+  border-bottom: 1px solid #eee;
+}
+.stat { text-align: center; }
+.stat-value { font-size: 20px; font-weight: 700; color: #6C63FF; }
+.stat-label { font-size: 10px; color: #888; margin-top: 2px; }
+.last-task {
+  padding: 10px 16px;
+  color: #555;
+  font-size: 12px;
+  min-height: 36px;
+  border-bottom: 1px solid #eee;
+}
+.actions {
+  display: flex;
+  gap: 8px;
+  padding: 12px 16px;
+}
+button {
+  flex: 1;
+  padding: 7px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+}
+.btn-primary { background: #6C63FF; color: #fff; }
+.btn-primary:hover { background: #5a52d5; }
+.btn-secondary { background: #f0f0f0; color: #444; }
+.btn-secondary:hover { background: #e0e0e0; }
+.settings-panel {
+  padding: 12px 16px;
+  border-top: 1px solid #eee;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.settings-panel label { font-size: 11px; color: #666; }
+.settings-panel input {
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 6px 8px;
+  font-size: 12px;
+  width: 100%;
+}
+.hidden { display: none !important; }

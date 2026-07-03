@@ -1,0 +1,11 @@
+{
+	"/": [
+		"src/routes/+page.ts"
+	],
+	"/analytics": [],
+	"/calendar": [],
+	"/compose": [],
+	"/grillme": [],
+	"/personas": [],
+	"/today": []
+}

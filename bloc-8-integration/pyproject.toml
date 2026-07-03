@@ -1,0 +1,29 @@
+[project]
+name = "saas-rse-integration"
+version = "0.1.0"
+description = "Tests d'intégration E2E pour SaaS RSE"
+requires-python = ">=3.11,<3.13"
+dependencies = [
+  "pytest>=8.3,<9",
+  "pytest-asyncio>=0.24,<1",
+  "httpx>=0.28,<1",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest-mock>=3.14,<4",
+  "pytest-cov>=5.0,<6",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+pythonpath = ["."]
+markers = [
+  "slow: requires live LLM (Ollama) — skip in fast CI",
+  "integration: requires real external services (FAL.ai, etc.)",
+  "bloc1: requires bloc-1 backend on :8000",
+  "bloc2: requires bloc-2 GrilledMe on :8001",
+  "bloc3: requires bloc-3 generation on :8003",
+  "bloc7: requires bloc-7 resilience on :8002",
+]
+addopts = "-m 'not slow and not integration'"

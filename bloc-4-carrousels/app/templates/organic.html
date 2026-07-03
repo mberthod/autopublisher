@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    width: {{ width }}px;
+    height: {{ height }}px;
+    font-family: system-ui, -apple-system, sans-serif;
+    background: {{ slide.background_color }};
+    color: {{ slide.text_color }};
+    overflow: hidden;
+    position: relative;
+  }
+  .blob {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(80px);
+    opacity: 0.12;
+  }
+  .blob-1 {
+    width: 600px; height: 600px;
+    background: #4CAF50;
+    top: -200px; left: -100px;
+  }
+  .blob-2 {
+    width: 500px; height: 500px;
+    background: #8BC34A;
+    bottom: -150px; right: -100px;
+  }
+  .blob-3 {
+    width: 300px; height: 300px;
+    background: #CDDC39;
+    top: 50%; left: 60%;
+    transform: translate(-50%, -50%);
+  }
+  .content {
+    position: relative;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 100px;
+  }
+  .leaf-icon {
+    font-size: 48px;
+    margin-bottom: 40px;
+  }
+  .slide-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 32px;
+  }
+  .slide-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: currentColor;
+    opacity: 0.3;
+  }
+  .slide-info span {
+    font-size: 14px;
+    opacity: 0.4;
+    letter-spacing: 2px;
+  }
+  .title {
+    font-size: 68px;
+    font-weight: 700;
+    line-height: 1.15;
+    letter-spacing: -2px;
+    margin-bottom: 36px;
+  }
+  .body {
+    font-size: 30px;
+    font-weight: 400;
+    line-height: 1.7;
+    opacity: 0.72;
+    max-width: 800px;
+  }
+  .bu-tag {
+    position: absolute;
+    bottom: 72px;
+    right: 100px;
+    font-size: 12px;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    opacity: 0.25;
+  }
+</style>
+</head>
+<body>
+  <div class="blob blob-1"></div>
+  <div class="blob blob-2"></div>
+  <div class="blob blob-3"></div>
+  <div class="content">
+    <div class="slide-info">
+      <div class="slide-dot"></div>
+      <span>{{ "%02d"|format(slide.index + 1) }} / {{ "%02d"|format(total) }}</span>
+    </div>
+    {% if slide.title %}
+    <div class="title">{{ slide.title }}</div>
+    {% endif %}
+    <div class="body">{{ slide.body }}</div>
+  </div>
+  <div class="bu-tag">{{ bu }}</div>
+</body>
+</html>

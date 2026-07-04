@@ -1,4 +1,5 @@
 import os
+import re
 from typing import Optional
 
 import httpx
@@ -11,11 +12,17 @@ IMAGE_PROMPT_TEMPLATE = (
     "Clean editorial photograph, {ton_visuel} style, natural lighting, premium and sober mood, "
     "depicting: {angle_editorial}. "
     "Dominant colors: {couleurs}. Empty clean negative space in the lower third. "
-    "Absolutely NO text, no letters, no words, no captions, no signage, no writing, "
-    "no watermark, no logo, no numbers anywhere in the image. Photorealistic, high quality."
+    "Photorealistic, high quality, no text in the scene."
 )
 
-FAL_MODEL = "fal-ai/flux/schnell"
+# Anti-prompt : flux/dev respecte le negative_prompt (contrairement à schnell qui
+# incrustait du faux texte dans l'image).
+NEGATIVE_PROMPT = (
+    "text, letters, words, typography, writing, caption, subtitle, watermark, "
+    "signage, poster, banner, numbers, logo, gibberish, distorted text"
+)
+
+FAL_MODEL = "fal-ai/flux/dev"
 FAL_ENDPOINT = f"https://fal.run/{FAL_MODEL}"
 
 # Instagram = carré, LinkedIn = paysage
@@ -51,8 +58,13 @@ class ImageService:
             response = httpx.post(
                 FAL_ENDPOINT,
                 headers={"Authorization": f"Key {self._fal_key}"},
-                json={"prompt": prompt, "image_size": image_size, "num_images": 1},
-                timeout=60,
+                json={
+                    "prompt": prompt,
+                    "negative_prompt": NEGATIVE_PROMPT,
+                    "image_size": image_size,
+                    "num_images": 1,
+                },
+                timeout=90,
             )
             response.raise_for_status()
             remote_url = response.json()["images"][0]["url"]
@@ -117,10 +129,14 @@ def _add_overlay(path: str, headline: str) -> None:
         d.line([(0, H - band + i), (W, H - band + i)], fill=(8, 8, 18, a))
 
     if headline:
+        # Accroche courte : première phrase du hook (évite la troncature)
+        hook = re.split(r"(?<=[.?!])\s", headline.strip())[0]
+        if len(hook) > 85:
+            hook = hook[:82].rstrip() + "…"
         fs = max(20, int(W * 0.052))
         font = _font(fs)
         margin = int(W * 0.05)
-        lines = _wrap(d, headline.strip().upper(), font, W - 2 * margin)
+        lines = _wrap(d, hook.upper(), font, W - 2 * margin)
         lh = int(fs * 1.18)
         y = H - margin - lh * len(lines)
         # petite barre accent Noisyless

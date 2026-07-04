@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { Post, Persona } from '$lib/types';
+  import { errorLabel } from '$lib/types';
   import { api } from '$lib/api';
   import StatusBadge from './StatusBadge.svelte';
   import PlatformIcon from './PlatformIcon.svelte';
@@ -64,8 +65,8 @@
     <span class="media-link">{post.carousel_urls.length} slide(s) de carrousel</span>
   {/if}
 
-  {#if post.status === 'failed' && post.error_message}
-    <div class="error-line">⚠ {post.error_code}: {post.error_message}</div>
+  {#if post.status === 'failed'}
+    <div class="error-line" title={post.error_message ?? ''}>⚠ {errorLabel(post.error_code)}</div>
   {/if}
 
   {#if post.published_url}

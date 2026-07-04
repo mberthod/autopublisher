@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { api } from '$lib/api';
   import type { Post, Persona, PersonaMap } from '$lib/types';
+  import { errorLabel } from '$lib/types';
   import PlatformIcon from '$lib/components/PlatformIcon.svelte';
 
   let posts: Post[] = [];
@@ -195,7 +196,7 @@
         <p class="modal-date">Planifié : {new Date(p.scheduled_for).toLocaleString('fr-FR')}</p>
       {/if}
       {#if p.status === 'failed'}
-        <p class="modal-error">⚠ {p.error_code}: {p.error_message}</p>
+        <p class="modal-error" title={p.error_message ?? ''}>⚠ {errorLabel(p.error_code)}{p.error_message ? ` — ${p.error_message}` : ''}</p>
       {/if}
     </div>
   </div>

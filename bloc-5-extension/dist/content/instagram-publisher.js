@@ -126,6 +126,14 @@
       await humanPause();
       const shareBtn = await waitForElement(sel.share_button, { timeoutMs: 1e4 });
       await humanClick(shareBtn);
+      const confirmed = await waitForElement(sel.success_indicator, { timeoutMs: 3e4 }).catch(() => null);
+      if (!confirmed) {
+        return {
+          status: "failed",
+          error_code: "PUBLISH_UNCONFIRMED",
+          error_message: "No success indicator within 30s after clicking share"
+        };
+      }
       return { status: "success", post_url: null };
     } catch (err) {
       const code = err.message.includes("not found") ? "SELECTOR_NOT_FOUND" : "UNKNOWN";

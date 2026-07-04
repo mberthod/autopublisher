@@ -61,6 +61,16 @@ async function publishInstagram(task, sel) {
     const shareBtn = await waitForElement(sel.share_button, { timeoutMs: 10_000 });
     await humanClick(shareBtn);
 
+    // Confirmation reelle : sans indicateur de succes, ne pas marquer published
+    const confirmed = await waitForElement(sel.success_indicator, { timeoutMs: 30_000 }).catch(() => null);
+    if (!confirmed) {
+      return {
+        status: "failed",
+        error_code: "PUBLISH_UNCONFIRMED",
+        error_message: "No success indicator within 30s after clicking share",
+      };
+    }
+
     return { status: "success", post_url: null };
   } catch (err) {
     const code = err.message.includes("not found") ? "SELECTOR_NOT_FOUND" : "UNKNOWN";

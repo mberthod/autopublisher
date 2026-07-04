@@ -157,7 +157,15 @@ async function publishLinkedIn(task, sel) {
     // ----- ETAPE 6 : attendre la confirmation -----
     await waitForElement(sel.success_toast, { timeoutMs: 30_000 });
 
-    return { status: "success", post_url: null };
+    // Le toast contient un lien "Voir le post" → published_url (debloque le
+    // scraping analytics J+1)
+    let postUrl = null;
+    if (sel.success_toast_link) {
+      const link = await waitForElement(sel.success_toast_link, { timeoutMs: 5_000 }).catch(() => null);
+      if (link?.href) postUrl = link.href;
+    }
+
+    return { status: "success", post_url: postUrl };
   } catch (err) {
     const code = err.message.includes("not found") || err.message.includes("Editor not found")
       ? "SELECTOR_NOT_FOUND"

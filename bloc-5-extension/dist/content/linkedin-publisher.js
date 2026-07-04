@@ -212,7 +212,12 @@
       const submitBtn = await waitForElement(sel.btn_submit, { timeoutMs: 1e4 });
       await humanClick(submitBtn);
       await waitForElement(sel.success_toast, { timeoutMs: 3e4 });
-      return { status: "success", post_url: null };
+      let postUrl = null;
+      if (sel.success_toast_link) {
+        const link = await waitForElement(sel.success_toast_link, { timeoutMs: 5e3 }).catch(() => null);
+        if (link?.href) postUrl = link.href;
+      }
+      return { status: "success", post_url: postUrl };
     } catch (err) {
       const code = err.message.includes("not found") || err.message.includes("Editor not found") ? "SELECTOR_NOT_FOUND" : "UNKNOWN";
       return { status: "failed", error_code: code, error_message: err.message };

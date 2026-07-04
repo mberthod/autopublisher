@@ -62,3 +62,16 @@ export interface Post {
 }
 
 export type PersonaMap = Record<string, Persona>;
+
+export const ERROR_LABELS: Record<string, string> = {
+  WRONG_IDENTITY: "Mauvaise identité de publication — le post n'a PAS été publié",
+  PUBLISH_UNCONFIRMED: "Publication non confirmée — vérifier manuellement",
+  AUTH_REQUIRED: "Session déconnectée — se reconnecter dans le navigateur",
+  SELECTOR_NOT_FOUND: "Élément introuvable dans la page (sélecteurs à mettre à jour)",
+  UNKNOWN: "Erreur inconnue",
+};
+
+export function errorLabel(code: string | null | undefined): string {
+  if (!code) return 'Échec';
+  return ERROR_LABELS[code] ?? code;
+}

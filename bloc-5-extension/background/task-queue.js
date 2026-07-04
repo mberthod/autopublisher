@@ -1,5 +1,6 @@
 const QUEUE_KEY = "taskQueue";
-const MIN_DELAY_BETWEEN_POSTS_MS = 4 * 60 * 60 * 1000; // 4h per platform
+const LAST_PUBLISH_KEY = "lastPublishedAt";
+export const MIN_DELAY_BETWEEN_POSTS_MS = 4 * 60 * 60 * 1000; // 4h per route
 
 async function readQueue() {
   return new Promise((r) =>
@@ -9,6 +10,16 @@ async function readQueue() {
 
 async function writeQueue(q) {
   await chrome.storage.local.set({ [QUEUE_KEY]: q });
+}
+
+async function readLastPublished() {
+  return new Promise((r) =>
+    chrome.storage.local.get(LAST_PUBLISH_KEY, (d) => r(d[LAST_PUBLISH_KEY] || {}))
+  );
+}
+
+function routeOf(task) {
+  return task.publish_via || task.platform;
 }
 
 export async function enqueue(tasks) {
@@ -22,7 +33,13 @@ export async function enqueue(tasks) {
 
 export async function dequeue() {
   const q = await readQueue();
-  const idx = q.findIndex((t) => t.status === "pending");
+  const last = await readLastPublished();
+  const now = Date.now();
+  // Anti-spam : au plus une publication toutes les 4h par route (le poll
+  // suivant, 5 min plus tard, retentera les tasks encore bloquees).
+  const idx = q.findIndex(
+    (t) => t.status === "pending" && now - (last[routeOf(t)] || 0) >= MIN_DELAY_BETWEEN_POSTS_MS
+  );
   if (idx === -1) return null;
   const task = q[idx];
   q[idx] = { ...task, status: "running" };
@@ -32,10 +49,16 @@ export async function dequeue() {
 
 export async function markDone(taskId, result) {
   const q = await readQueue();
+  const done = q.find((t) => t.task_id === taskId);
   const updated = q.map((t) =>
     t.task_id === taskId ? { ...t, status: "done", result, doneAt: Date.now() } : t
   );
   await writeQueue(updated.filter((t) => t.status !== "done" || Date.now() - t.doneAt < 3600_000));
+  if (done) {
+    const last = await readLastPublished();
+    last[routeOf(done)] = Date.now();
+    await chrome.storage.local.set({ [LAST_PUBLISH_KEY]: last });
+  }
 }
 
 export async function markFailed(taskId, err) {

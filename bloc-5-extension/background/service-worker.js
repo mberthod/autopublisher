@@ -56,7 +56,8 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
 // Allow popup to trigger an immediate poll
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg.type === "FORCE_POLL") {
-    pollAndProcess().then(() => sendResponse({ ok: true }));
+    // Declenchement manuel : ignore le delai anti-spam de 4h
+    pollAndProcess({ manual: true }).then(() => sendResponse({ ok: true }));
     return true; // keep channel open for async
   }
   if (msg.type === "GET_STATS") {
@@ -99,18 +100,18 @@ async function refreshSelectors() {
   }
 }
 
-async function pollAndProcess() {
+async function pollAndProcess({ manual = false } = {}) {
   try {
     const { tasks } = await fetchPendingTasks();
     if (tasks.length > 0) await enqueue(tasks);
   } catch (e) {
     console.warn("[SW] poll failed:", e.message);
   }
-  await processNext();
+  await processNext({ manual });
 }
 
-async function processNext() {
-  const task = await dequeue();
+async function processNext({ manual = false } = {}) {
+  const task = await dequeue({ ignoreDelay: manual });
   if (!task) return;
 
   let selectors;

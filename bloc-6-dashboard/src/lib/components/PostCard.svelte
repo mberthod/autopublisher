@@ -22,6 +22,7 @@
 
   let loading = false;
   let errorMsg = '';
+  let publishHint = false;
 
   async function action(newStatus: string) {
     loading = true;
@@ -29,6 +30,25 @@
     try {
       const updated = await api.posts.update(post.id, { status: newStatus as Post['status'] });
       onUpdate(updated);
+    } catch (e) {
+      errorMsg = e instanceof Error ? e.message : String(e);
+    } finally {
+      loading = false;
+    }
+  }
+
+  // Mode manuel : passe le post en file de publication immédiate (scheduled, daté maintenant).
+  // La publication réelle se déclenche depuis le popup de l'extension → « Publier maintenant ».
+  async function publishNow() {
+    loading = true;
+    errorMsg = '';
+    try {
+      const updated = await api.posts.update(post.id, {
+        status: 'scheduled',
+        scheduled_for: new Date().toISOString(),
+      });
+      onUpdate(updated);
+      publishHint = true;
     } catch (e) {
       errorMsg = e instanceof Error ? e.message : String(e);
     } finally {
@@ -77,21 +97,25 @@
     <div class="error-line">{errorMsg}</div>
   {/if}
 
+  {#if publishHint}
+    <div class="publish-hint">
+      ✅ En file de publication. Ouvre l'extension et clique <strong>« ▶ Publier maintenant »</strong> pour lancer la publication.
+    </div>
+  {/if}
+
   <footer>
-    {#if post.status === 'draft'}
-      <button class="btn btn-primary btn-sm" on:click={() => action('validated')} disabled={loading}>
-        {loading ? '…' : 'Valider'}
+    {#if post.status !== 'published'}
+      <button class="btn btn-publish btn-sm" on:click={publishNow} disabled={loading} title="Passe le post en file et se publie via l'extension">
+        {loading ? '…' : '📤 Publier maintenant'}
       </button>
-      <button class="btn btn-secondary btn-sm" on:click={() => action('scheduled')} disabled={loading}>
-        Planifier
+    {/if}
+    {#if post.status === 'draft'}
+      <button class="btn btn-secondary btn-sm" on:click={() => action('validated')} disabled={loading}>
+        Valider
       </button>
     {:else if post.status === 'failed'}
-      <button class="btn btn-primary btn-sm" on:click={() => action('scheduled')} disabled={loading}>
-        {loading ? '…' : 'Réessayer'}
-      </button>
-    {:else if post.status === 'validated'}
-      <button class="btn btn-primary btn-sm" on:click={() => action('scheduled')} disabled={loading}>
-        {loading ? '…' : 'Planifier'}
+      <button class="btn btn-secondary btn-sm" on:click={() => action('scheduled')} disabled={loading}>
+        Réessayer
       </button>
     {/if}
     <button class="btn btn-danger btn-sm" on:click={() => action('draft')} disabled={loading}>
@@ -176,8 +200,24 @@
     padding: 6px 10px;
     border-radius: 5px;
   }
+  .publish-hint {
+    font-size: 12px;
+    color: #075985;
+    background: #E0F2FE;
+    border: 1px solid #7DD3FC;
+    padding: 8px 10px;
+    border-radius: 6px;
+    line-height: 1.4;
+  }
+  .btn-publish {
+    background: #6C63FF;
+    color: #fff;
+    border-color: #6C63FF;
+  }
+  .btn-publish:hover:not(:disabled) { background: #5A52E0; }
 
   footer {
+    flex-wrap: wrap;
     display: flex;
     gap: 8px;
     padding-top: 4px;

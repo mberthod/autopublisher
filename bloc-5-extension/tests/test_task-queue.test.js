@@ -70,6 +70,15 @@ describe("dequeue anti-spam (MIN_DELAY_BETWEEN_POSTS_MS)", () => {
     expect(await mod.dequeue()).toBeNull();
   });
 
+  it("ignoreDelay=true (publication manuelle) bypasse le delai de 4h", async () => {
+    const now = Date.now();
+    store.taskQueue = [{ task_id: "t1", platform: "linkedin", status: "pending" }];
+    store.lastPublishedAt = { linkedin: now - 60 * 1000 }; // 1 min → normalement bloqué
+    expect(await mod.dequeue()).toBeNull();
+    const task = await mod.dequeue({ ignoreDelay: true });
+    expect(task?.task_id).toBe("t1");
+  });
+
   it("markDone enregistre le timestamp de la route", async () => {
     store.taskQueue = [{ task_id: "t1", platform: "linkedin", status: "running" }];
     await mod.markDone("t1", { status: "success" });

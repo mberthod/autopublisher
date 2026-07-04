@@ -279,6 +279,25 @@
     }
   }
 
+  // Mode manuel : publier ce post immédiatement (scheduled daté maintenant).
+  // Le déclenchement réel se fait depuis le popup de l'extension.
+  let publishHintId = '';
+  async function publishNow(p: GenPost) {
+    if (!p.post_id) return;
+    posts = posts.map(x => x.id === p.id ? { ...x, saving: true } : x);
+    try {
+      await api.posts.update(p.post_id, {
+        text: p.text,
+        status: 'scheduled',
+        scheduled_for: new Date().toISOString(),
+      });
+      posts = posts.map(x => x.id === p.id ? { ...x, saving: false, status: 'scheduled' } : x);
+      publishHintId = p.id;
+    } catch (e) {
+      posts = posts.map(x => x.id === p.id ? { ...x, saving: false } : x);
+    }
+  }
+
   async function regeneratePost(p: GenPost) {
     if (!p.post_id) return;
     const idea = ideas.find(i => i.id === p.idea_id);
@@ -628,15 +647,12 @@
             ></textarea>
             <div class="card-actions">
               <button
-                class="btn-validate"
-                class:done={post.status === 'scheduled'}
-                on:click={() => validatePost(post)}
-                disabled={post.saving || !post.post_id || post.status === 'scheduled'}
+                class="btn-publish-now"
+                on:click={() => publishNow(post)}
+                disabled={post.saving || !post.post_id}
+                title="Publier maintenant via l'extension (mode manuel)"
               >
-                {#if post.saving}…
-                {:else if post.status === 'scheduled'}✅ Validé
-                {:else}✅ Valider
-                {/if}
+                {post.saving ? '…' : '📤 Publier'}
               </button>
               <button
                 class="btn-regen"
@@ -647,6 +663,11 @@
               </button>
               <button class="btn-del" on:click={() => deletePost(post.id)} title="Supprimer">✕</button>
             </div>
+            {#if publishHintId === post.id}
+              <div class="publish-hint-dark">
+                ✅ En file. Ouvre l'extension → <strong>▶ Publier maintenant</strong>.
+              </div>
+            {/if}
           </div>
         </div>
       {/each}
@@ -1004,6 +1025,31 @@
   .btn-validate:hover:not(:disabled):not(.done) { background: #1B5E3A; }
   .btn-validate:disabled { opacity: 0.4; cursor: default; }
   .btn-validate.done { background: #1B5E3A; border-color: #34D399; }
+
+  .btn-publish-now {
+    flex: 1;
+    padding: 7px 10px;
+    background: linear-gradient(135deg, #6C63FF, #8B5CF6);
+    border: none;
+    border-radius: 6px;
+    color: #fff;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: filter 0.12s;
+  }
+  .btn-publish-now:hover:not(:disabled) { filter: brightness(1.1); }
+  .btn-publish-now:disabled { opacity: 0.4; cursor: default; }
+  .publish-hint-dark {
+    margin-top: 8px;
+    font-size: 11px;
+    color: #7DD3FC;
+    background: #0C2A3A;
+    border: 1px solid #164E63;
+    padding: 7px 10px;
+    border-radius: 6px;
+    line-height: 1.4;
+  }
 
   .btn-regen {
     padding: 7px 10px;

@@ -31,14 +31,16 @@ export async function enqueue(tasks) {
   await writeQueue(q);
 }
 
-export async function dequeue() {
+export async function dequeue({ ignoreDelay = false } = {}) {
   const q = await readQueue();
   const last = await readLastPublished();
   const now = Date.now();
   // Anti-spam : au plus une publication toutes les 4h par route (le poll
   // suivant, 5 min plus tard, retentera les tasks encore bloquees).
+  // ignoreDelay=true pour une publication manuelle explicite (bouton popup).
   const idx = q.findIndex(
-    (t) => t.status === "pending" && now - (last[routeOf(t)] || 0) >= MIN_DELAY_BETWEEN_POSTS_MS
+    (t) => t.status === "pending" &&
+      (ignoreDelay || now - (last[routeOf(t)] || 0) >= MIN_DELAY_BETWEEN_POSTS_MS)
   );
   if (idx === -1) return null;
   const task = q[idx];

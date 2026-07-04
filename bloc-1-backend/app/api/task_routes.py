@@ -22,6 +22,7 @@ class PendingTask(BaseModel):
     scheduled_for: Optional[str]
     selectors_version: str = "2026-07-04-v3"
     page_url: Optional[str] = None
+    publish_as_name: Optional[str] = None
 
 
 class TasksResponse(BaseModel):
@@ -59,9 +60,13 @@ def get_pending_tasks(db: Session = Depends(get_db)):
             media_urls.extend(p.carousel_urls)
         persona = p.persona
         page_url = None
+        publish_as_name = None
+        BU_LABELS = {"noisyless": "Noisyless", "afluxo": "Afluxo", "mbhrep": "MBHREP"}
         if persona:
             if p.platform == "linkedin":
                 page_url = persona.linkedin_page_url
+                if page_url:  # n'imposer l'identite que si une page est configuree
+                    publish_as_name = BU_LABELS.get(persona.bu)
             elif p.platform == "instagram":
                 page_url = persona.instagram_page_url
 
@@ -74,6 +79,7 @@ def get_pending_tasks(db: Session = Depends(get_db)):
             media_urls=media_urls,
             scheduled_for=p.scheduled_for.isoformat() if p.scheduled_for else None,
             page_url=page_url,
+            publish_as_name=publish_as_name,
         ))
     return TasksResponse(tasks=tasks)
 

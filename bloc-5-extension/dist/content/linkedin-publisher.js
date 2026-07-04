@@ -99,50 +99,135 @@
     );
     return true;
   });
+  function findByText(selector, text) {
+    const els = document.querySelectorAll(selector);
+    return Array.from(els).find((el) => el.textContent.trim().includes(text)) || null;
+  }
+  async function waitForEditor(timeoutMs = 15e3) {
+    const selectors = [
+      "div[role='textbox'][contenteditable='true']",
+      "div.ql-editor[contenteditable='true']",
+      "div[contenteditable='true'][data-placeholder]",
+      "div[contenteditable='true'].editor-content",
+      "div[contenteditable='true']"
+    ];
+    return new Promise((resolve, reject) => {
+      const deadline = Date.now() + timeoutMs;
+      function check() {
+        for (const sel of selectors) {
+          try {
+            const el = document.querySelector(sel);
+            if (el && el.offsetHeight > 30) return resolve(el);
+          } catch {
+          }
+        }
+        if (Date.now() > deadline) {
+          return reject(new Error("LinkedIn composer editor not found after " + timeoutMs + "ms"));
+        }
+        setTimeout(check, 300);
+      }
+      check();
+    });
+  }
   async function publishLinkedIn(task, sel) {
     const path = window.location.pathname;
-    const isLoginPage = /^\/(login|checkpoint|signup|uas|session-expired)/.test(path);
-    if (isLoginPage) {
+    if (/^\/(login|checkpoint|signup|uas|session-expired)/.test(path)) {
       return { status: "failed", error_code: "AUTH_REQUIRED", error_message: "Not logged into LinkedIn" };
     }
     try {
-      await waitForElement("div[data-view-name='feed-index-container'], main, div.feed-container-theme", { timeoutMs: 15e3 });
+      await waitForElement(
+        "div[data-view-name='feed-index-container'], main, div.feed-container-theme, div[class*='feed']",
+        { timeoutMs: 15e3 }
+      ).catch(() => null);
       await humanPause();
-      let editor = document.querySelector("div[role='textbox'][contenteditable='true'], div.ql-editor[contenteditable='true']");
+      await new Promise((r) => setTimeout(r, 2500));
+      let editor = null;
+      try {
+        editor = await waitForEditor(5e3);
+      } catch {
+      }
       if (!editor) {
         const composeSels = [
-          sel.btn_open_compose,
-          "button[aria-label*='post' i]",
-          "button[aria-label*='Commencer' i]",
-          "button[aria-label*='Start' i]",
+          "button[aria-label='Commencer un post']",
+          "button[aria-label='Start a post']",
+          "button[aria-label='Demarrer un post']",
           ".share-box-feed-entry__trigger",
           "div.share-box-feed-entry__top-bar button",
           "div[class*='share-box'] button",
           "div[class*='trigger'] button"
-        ].filter(Boolean).join(", ");
-        const composeBtn = await waitForElement(composeSels, { timeoutMs: 1e4 });
-        await humanClick(composeBtn);
-        editor = await waitForElement(
-          "div[role='textbox'][contenteditable='true'], div.ql-editor[contenteditable='true']",
-          { timeoutMs: 1e4 }
-        );
+        ].join(", ");
+        const btn = await waitForElement(composeSels, { timeoutMs: 8e3 }).catch(() => null);
+        if (btn) {
+          await humanClick(btn);
+          await new Promise((r) => setTimeout(r, 1500));
+        }
+        editor = await waitForEditor(12e3);
+      }
+      if (task.publish_as_name) {
+        await selectPublishingIdentity(task.publish_as_name);
       }
       await humanClick(editor);
       if (task.text) await typeText(editor, task.text);
       if (task.media_urls?.length > 0) {
         await humanPause();
-        const fileInput = await waitForElement(sel.file_input, { timeoutMs: 5e3 });
-        await uploadMediaFromUrl(fileInput, task.media_urls[0], `post_${task.post_id}.png`, task.media_data?.[0] ?? null);
+        const fileInput = await waitForElement(
+          "input[type='file'][accept*='image'], input[type='file']",
+          { timeoutMs: 5e3 }
+        );
+        await uploadMediaFromUrl(
+          fileInput,
+          task.media_urls[0],
+          `post_${task.post_id}.png`,
+          task.media_data?.[0] ?? null
+        );
         await humanPause();
       }
       await humanPause();
-      const submitBtn = await waitForElement(sel.btn_submit, { timeoutMs: 1e4 });
+      const submitSel = [
+        "button.share-actions__primary-action",
+        "button[class*='share-actions__primary']",
+        "button[aria-label='Publier']",
+        "button[aria-label='Post']",
+        "button[aria-label='Partager']"
+      ].join(", ");
+      const submitBtn = await waitForElement(submitSel, { timeoutMs: 1e4 });
       await humanClick(submitBtn);
-      await waitForElement(sel.success_toast, { timeoutMs: 3e4 });
+      await waitForElement("div[role='alert'], div[class*='artdeco-toast']", { timeoutMs: 3e4 });
       return { status: "success", post_url: null };
     } catch (err) {
       const code = err.message.includes("not found") ? "SELECTOR_NOT_FOUND" : "UNKNOWN";
       return { status: "failed", error_code: code, error_message: err.message };
+    }
+  }
+  async function selectPublishingIdentity(pageName) {
+    try {
+      const pickerSel = [
+        "button[aria-label*='Choisissez']",
+        "button[aria-label*='Choose']",
+        "button[aria-label*='identite']",
+        "button[aria-label*='identity']",
+        "div[class*='actor'] button",
+        "div[class*='identity'] button",
+        ".share-creation-state__actor-trigger",
+        "button[class*='actor']"
+      ].join(", ");
+      const pickerBtn = await waitForElement(pickerSel, { timeoutMs: 5e3 }).catch(() => null);
+      if (!pickerBtn) return;
+      await humanClick(pickerBtn);
+      await new Promise((r) => setTimeout(r, 800));
+      const optionSels = [
+        "[role='option']",
+        "[role='radio']",
+        "li[class*='actor']",
+        "div[class*='actor-option']",
+        "div[class*='identity-option']"
+      ].join(", ");
+      const option = findByText(optionSels, pageName);
+      if (option) {
+        await humanClick(option);
+        await new Promise((r) => setTimeout(r, 500));
+      }
+    } catch {
     }
   }
 })();

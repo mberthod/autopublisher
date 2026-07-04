@@ -223,8 +223,10 @@
           platform,
         });
 
+        // Priorité à l'image IA (FAL.ai) renvoyée par bloc-3 ; le template
+        // bloc-4 (titre sur fond) ne sert que de secours si FAL est indisponible.
         let imageUrl = resp.image_url ?? '';
-        if (format !== 'text_only') {
+        if (format !== 'text_only' && !imageUrl) {
           const persona = personas.find(p => p.id === personaId);
           const buTheme = BU_THEMES[persona?.bu ?? 'noisyless'];
           const visualTitle = resp.visual_headline || idea.angle.slice(0, 80);
@@ -312,7 +314,7 @@
         platform: p.platform,
       });
       let imageUrl = resp.image_url ?? '';
-      if (format !== 'text_only') {
+      if (format !== 'text_only' && !imageUrl) {
         const persona = personas.find(pe => pe.id === personaId);
         const buTheme = BU_THEMES[persona?.bu ?? 'noisyless'];
         const visualTitle = resp.visual_headline || idea?.angle.slice(0, 80) || '';

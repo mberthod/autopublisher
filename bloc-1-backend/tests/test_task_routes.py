@@ -107,6 +107,24 @@ def test_callback_not_found(client):
     assert r.status_code == 404
 
 
+def test_pending_task_company_page(client):
+    # Persona avec page entreprise LinkedIn → la task porte page_url + publish_as_name
+    r = client.patch("/api/v1/personas/p1", json={
+        "linkedin_page_url": "https://www.linkedin.com/company/noisyless/admin/"
+    })
+    assert r.status_code == 200
+    r2 = client.get("/api/v1/tasks/pending")
+    t = r2.json()["tasks"][0]
+    assert t["page_url"] == "https://www.linkedin.com/company/noisyless/admin/"
+    assert t["publish_as_name"] == "Noisyless"
+
+
+def test_pending_task_selectors_version_is_latest(client):
+    from app.api.selector_routes import LATEST_VERSION
+    r = client.get("/api/v1/tasks/pending")
+    assert r.json()["tasks"][0]["selectors_version"] == LATEST_VERSION
+
+
 def test_selectors_latest(client):
     r = client.get("/api/v1/selectors/latest")
     assert r.status_code == 200
@@ -114,6 +132,18 @@ def test_selectors_latest(client):
     assert "platforms" in data
     assert "linkedin" in data["platforms"]
     assert "instagram" in data["platforms"]
+
+
+def test_selectors_v4_identity_keys(client):
+    r = client.get("/api/v1/selectors/latest")
+    li = r.json()["platforms"]["linkedin"]
+    for key in ("identity_picker_trigger", "identity_option", "actor_name", "success_toast_link"):
+        assert key in li, f"missing {key} in latest linkedin selectors"
+
+
+def test_selectors_old_versions_still_served(client):
+    for version in ("2026-07-01-v1", "2026-07-04-v2", "2026-07-04-v3"):
+        assert client.get(f"/api/v1/selectors/{version}").status_code == 200
 
 
 def test_selectors_by_version(client):

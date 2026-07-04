@@ -84,6 +84,17 @@
     fileInput.dispatchEvent(new Event("input", { bubbles: true }));
   }
 
+  // content/shared/identity.js
+  function normalizeName(s) {
+    return (s || "").normalize("NFD").replace(new RegExp("\\p{Diacritic}", "gu"), "").toLowerCase().replace(/\s+/g, " ").trim();
+  }
+  function identityMatches(actual, expected) {
+    const a = normalizeName(actual);
+    const e = normalizeName(expected);
+    if (!a || !e) return false;
+    return a.includes(e) || e.includes(a);
+  }
+
   // content/linkedin-publisher.js
   var _initialized = false;
   chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
@@ -103,28 +114,46 @@
     const els = document.querySelectorAll(selector);
     return Array.from(els).find((el) => el.textContent.trim().includes(text)) || null;
   }
-  async function waitForEditor(timeoutMs = 15e3) {
-    const selectors = [
-      "div[role='textbox'][contenteditable='true']",
-      "div.ql-editor[contenteditable='true']",
-      "div[contenteditable='true'][data-placeholder]",
-      "div[contenteditable='true'].editor-content",
-      "div[contenteditable='true']"
-    ];
+  function clickByText(texts) {
+    const candidates = document.querySelectorAll('button, [role="button"], a[class*="share"], div[class*="trigger"]');
+    for (const el of candidates) {
+      if (el.offsetHeight === 0) continue;
+      const t = el.textContent.trim().toLowerCase();
+      if (texts.some((kw) => t.includes(kw.toLowerCase()))) {
+        el.click();
+        return true;
+      }
+    }
+    return false;
+  }
+  function domSnapshot() {
+    const editables = [...document.querySelectorAll("[contenteditable]")].map((el) => {
+      const cls = el.className ? el.className.toString().split(" ").slice(0, 3).join(".") : "";
+      return `${el.tagName.toLowerCase()}${cls ? "." + cls : ""}[h=${el.offsetHeight},role=${el.getAttribute("role") || "-"},ph="${(el.getAttribute("data-placeholder") || "").substring(0, 20)}"]`;
+    });
+    const btns = [...document.querySelectorAll("button, [role='button']")].filter((b) => b.offsetHeight > 0).slice(0, 10).map((b) => `"${b.textContent.trim().substring(0, 30)}"[aria="${b.getAttribute("aria-label") || ""}"]`);
+    return `contenteditable=[${editables.join(" | ") || "none"}] buttons=[${btns.join(", ")}]`;
+  }
+  async function waitForEditor(editorSelectors, timeoutMs = 15e3) {
+    const selectors = editorSelectors.split(",").map((s) => s.trim()).filter(Boolean);
     return new Promise((resolve, reject) => {
       const deadline = Date.now() + timeoutMs;
       function check() {
         for (const sel of selectors) {
           try {
-            const el = document.querySelector(sel);
-            if (el && el.offsetHeight > 30) return resolve(el);
+            const candidates = [...document.querySelectorAll(sel)];
+            for (const el of candidates) {
+              if (el.offsetHeight > 20 && !el.closest("nav") && !el.closest("header") && !el.closest("[class*='search']")) {
+                return resolve(el);
+              }
+            }
           } catch {
           }
         }
         if (Date.now() > deadline) {
-          return reject(new Error("LinkedIn composer editor not found after " + timeoutMs + "ms"));
+          return reject(new Error(`Editor not found on ${window.location.pathname}. ${domSnapshot()}`));
         }
-        setTimeout(check, 300);
+        setTimeout(check, 400);
       }
       check();
     });
@@ -135,45 +164,42 @@
       return { status: "failed", error_code: "AUTH_REQUIRED", error_message: "Not logged into LinkedIn" };
     }
     try {
-      await waitForElement(
-        "div[data-view-name='feed-index-container'], main, div.feed-container-theme, div[class*='feed']",
-        { timeoutMs: 15e3 }
-      ).catch(() => null);
-      await humanPause();
-      await new Promise((r) => setTimeout(r, 2500));
+      await new Promise((r) => setTimeout(r, 3e3));
+      const openTexts = ["cr\xE9er un post", "commencer un post", "start a post", "create a post", "commencer", "cr\xE9er", "share"];
+      clickByText(openTexts);
+      await new Promise((r) => setTimeout(r, 1500));
       let editor = null;
       try {
-        editor = await waitForEditor(5e3);
+        editor = await waitForEditor(sel.text_editor, 8e3);
       } catch {
       }
       if (!editor) {
-        const composeSels = [
-          "button[aria-label='Commencer un post']",
-          "button[aria-label='Start a post']",
-          "button[aria-label='Demarrer un post']",
-          ".share-box-feed-entry__trigger",
-          "div.share-box-feed-entry__top-bar button",
-          "div[class*='share-box'] button",
-          "div[class*='trigger'] button"
-        ].join(", ");
-        const btn = await waitForElement(composeSels, { timeoutMs: 8e3 }).catch(() => null);
+        const btn = await waitForElement(sel.btn_open_compose, { timeoutMs: 5e3 }).catch(() => null);
         if (btn) {
           await humanClick(btn);
           await new Promise((r) => setTimeout(r, 1500));
+        } else {
+          clickByText(openTexts);
+          await new Promise((r) => setTimeout(r, 1500));
         }
-        editor = await waitForEditor(12e3);
+        editor = await waitForEditor(sel.text_editor, 12e3);
       }
       if (task.publish_as_name) {
-        await selectPublishingIdentity(task.publish_as_name);
+        const pickError = await selectPublishingIdentity(sel, task.publish_as_name);
+        const identity = readPublishingIdentity(sel);
+        if (!identityMatches(identity, task.publish_as_name)) {
+          return {
+            status: "failed",
+            error_code: "WRONG_IDENTITY",
+            error_message: `Compositeur en tant que '${identity || "inconnu"}' au lieu de '${task.publish_as_name}'` + (pickError ? ` (picker: ${pickError})` : "")
+          };
+        }
       }
       await humanClick(editor);
       if (task.text) await typeText(editor, task.text);
       if (task.media_urls?.length > 0) {
         await humanPause();
-        const fileInput = await waitForElement(
-          "input[type='file'][accept*='image'], input[type='file']",
-          { timeoutMs: 5e3 }
-        );
+        const fileInput = await waitForElement(sel.file_input, { timeoutMs: 5e3 });
         await uploadMediaFromUrl(
           fileInput,
           task.media_urls[0],
@@ -183,51 +209,43 @@
         await humanPause();
       }
       await humanPause();
-      const submitSel = [
-        "button.share-actions__primary-action",
-        "button[class*='share-actions__primary']",
-        "button[aria-label='Publier']",
-        "button[aria-label='Post']",
-        "button[aria-label='Partager']"
-      ].join(", ");
-      const submitBtn = await waitForElement(submitSel, { timeoutMs: 1e4 });
+      const submitBtn = await waitForElement(sel.btn_submit, { timeoutMs: 1e4 });
       await humanClick(submitBtn);
-      await waitForElement("div[role='alert'], div[class*='artdeco-toast']", { timeoutMs: 3e4 });
+      await waitForElement(sel.success_toast, { timeoutMs: 3e4 });
       return { status: "success", post_url: null };
     } catch (err) {
-      const code = err.message.includes("not found") ? "SELECTOR_NOT_FOUND" : "UNKNOWN";
+      const code = err.message.includes("not found") || err.message.includes("Editor not found") ? "SELECTOR_NOT_FOUND" : "UNKNOWN";
       return { status: "failed", error_code: code, error_message: err.message };
     }
   }
-  async function selectPublishingIdentity(pageName) {
+  function readPublishingIdentity(sel) {
+    for (const s of sel.actor_name.split(",").map((x) => x.trim())) {
+      try {
+        const els = [...document.querySelectorAll(s)];
+        for (const el of els) {
+          if (el.offsetHeight === 0) continue;
+          const t = el.textContent.trim();
+          if (t) return t;
+        }
+      } catch {
+      }
+    }
+    return null;
+  }
+  async function selectPublishingIdentity(sel, pageName) {
     try {
-      const pickerSel = [
-        "button[aria-label*='Choisissez']",
-        "button[aria-label*='Choose']",
-        "button[aria-label*='identite']",
-        "button[aria-label*='identity']",
-        "div[class*='actor'] button",
-        "div[class*='identity'] button",
-        ".share-creation-state__actor-trigger",
-        "button[class*='actor']"
-      ].join(", ");
-      const pickerBtn = await waitForElement(pickerSel, { timeoutMs: 5e3 }).catch(() => null);
-      if (!pickerBtn) return;
+      if (identityMatches(readPublishingIdentity(sel), pageName)) return null;
+      const pickerBtn = await waitForElement(sel.identity_picker_trigger, { timeoutMs: 5e3 }).catch(() => null);
+      if (!pickerBtn) return "identity picker not found";
       await humanClick(pickerBtn);
       await new Promise((r) => setTimeout(r, 800));
-      const optionSels = [
-        "[role='option']",
-        "[role='radio']",
-        "li[class*='actor']",
-        "div[class*='actor-option']",
-        "div[class*='identity-option']"
-      ].join(", ");
-      const option = findByText(optionSels, pageName);
-      if (option) {
-        await humanClick(option);
-        await new Promise((r) => setTimeout(r, 500));
-      }
-    } catch {
+      const option = findByText(sel.identity_option, pageName);
+      if (!option) return `option '${pageName}' not found in picker`;
+      await humanClick(option);
+      await new Promise((r) => setTimeout(r, 500));
+      return null;
+    } catch (err) {
+      return err.message;
     }
   }
 })();

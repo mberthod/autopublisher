@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from app.api.selector_routes import LATEST_VERSION
 from app.db import get_db
 from app.models import Post
 from app.services import post_service
@@ -20,7 +21,7 @@ class PendingTask(BaseModel):
     text: Optional[str]
     media_urls: list[str]
     scheduled_for: Optional[str]
-    selectors_version: str = "2026-07-04-v3"
+    selectors_version: str = LATEST_VERSION
     page_url: Optional[str] = None
     publish_as_name: Optional[str] = None
 

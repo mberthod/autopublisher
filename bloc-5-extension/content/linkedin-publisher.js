@@ -1,6 +1,7 @@
 import { waitForElement } from "./shared/wait-for-element.js";
 import { typeText, humanClick, humanPause } from "./shared/human-typer.js";
 import { uploadMediaFromUrl } from "./shared/media-uploader.js";
+import { identityMatches } from "./shared/identity.js";
 
 let _initialized = false;
 
@@ -21,21 +22,42 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   return true;
 });
 
-// Trouve un element contenant un texte specifique parmi plusieurs selecteurs
 function findByText(selector, text) {
   const els = document.querySelectorAll(selector);
   return Array.from(els).find((el) => el.textContent.trim().includes(text)) || null;
 }
 
-// Attendre qu'un element contenteditable apparaisse (LinkedIn n'utilise pas toujours role=textbox)
-async function waitForEditor(timeoutMs = 15_000) {
-  const selectors = [
-    "div[role='textbox'][contenteditable='true']",
-    "div.ql-editor[contenteditable='true']",
-    "div[contenteditable='true'][data-placeholder]",
-    "div[contenteditable='true'].editor-content",
-    "div[contenteditable='true']",
-  ];
+// Cliquer un element par son contenu texte (boutons FR + EN)
+function clickByText(texts) {
+  const candidates = document.querySelectorAll('button, [role="button"], a[class*="share"], div[class*="trigger"]');
+  for (const el of candidates) {
+    if (el.offsetHeight === 0) continue;
+    const t = el.textContent.trim().toLowerCase();
+    if (texts.some((kw) => t.includes(kw.toLowerCase()))) {
+      el.click();
+      return true;
+    }
+  }
+  return false;
+}
+
+// Snapshot DOM pour debug — liste tous les [contenteditable] et les boutons visibles
+function domSnapshot() {
+  const editables = [...document.querySelectorAll("[contenteditable]")].map((el) => {
+    const cls = el.className ? el.className.toString().split(" ").slice(0, 3).join(".") : "";
+    return `${el.tagName.toLowerCase()}${cls ? "." + cls : ""}[h=${el.offsetHeight},role=${el.getAttribute("role") || "-"},ph="${(el.getAttribute("data-placeholder") || "").substring(0, 20)}"]`;
+  });
+  const btns = [...document.querySelectorAll("button, [role='button']")]
+    .filter((b) => b.offsetHeight > 0)
+    .slice(0, 10)
+    .map((b) => `"${b.textContent.trim().substring(0, 30)}"[aria="${b.getAttribute("aria-label") || ""}"]`);
+  return `contenteditable=[${editables.join(" | ") || "none"}] buttons=[${btns.join(", ")}]`;
+}
+
+// Attendre l'editeur — itere sur la cascade de selecteurs remote (sel.text_editor),
+// en filtrant les elements invisibles et ceux de la nav/header/search.
+async function waitForEditor(editorSelectors, timeoutMs = 15_000) {
+  const selectors = editorSelectors.split(",").map((s) => s.trim()).filter(Boolean);
 
   return new Promise((resolve, reject) => {
     const deadline = Date.now() + timeoutMs;
@@ -43,67 +65,71 @@ async function waitForEditor(timeoutMs = 15_000) {
     function check() {
       for (const sel of selectors) {
         try {
-          const el = document.querySelector(sel);
-          // Ignorer les elements tres petits ou dans les nav (faux positifs)
-          if (el && el.offsetHeight > 30) return resolve(el);
+          const candidates = [...document.querySelectorAll(sel)];
+          for (const el of candidates) {
+            if (el.offsetHeight > 20 && !el.closest("nav") && !el.closest("header") && !el.closest("[class*='search']")) {
+              return resolve(el);
+            }
+          }
         } catch {}
       }
       if (Date.now() > deadline) {
-        return reject(new Error("LinkedIn composer editor not found after " + timeoutMs + "ms"));
+        return reject(new Error(`Editor not found on ${window.location.pathname}. ${domSnapshot()}`));
       }
-      setTimeout(check, 300);
+      setTimeout(check, 400);
     }
     check();
   });
 }
 
 async function publishLinkedIn(task, sel) {
-  // Check login
   const path = window.location.pathname;
   if (/^\/(login|checkpoint|signup|uas|session-expired)/.test(path)) {
     return { status: "failed", error_code: "AUTH_REQUIRED", error_message: "Not logged into LinkedIn" };
   }
 
   try {
-    // Attendre que le feed soit charge
-    await waitForElement(
-      "div[data-view-name='feed-index-container'], main, div.feed-container-theme, div[class*='feed']",
-      { timeoutMs: 15_000 }
-    ).catch(() => null); // non-bloquant si non trouve
-    await humanPause();
+    // Attendre que la page soit chargee
+    await new Promise((r) => setTimeout(r, 3000));
 
-    // Laisser le temps au modal ?shareActive=true de s'ouvrir
-    await new Promise((r) => setTimeout(r, 2500));
+    // Sur la page admin company (?share=true), le bouton "Créer un post" peut avoir besoin d'un clic
+    const openTexts = ["créer un post", "commencer un post", "start a post", "create a post", "commencer", "créer", "share"];
+    clickByText(openTexts);
+    await new Promise((r) => setTimeout(r, 1500));
 
-    // ----- ETAPE 1 : trouver ou ouvrir le compositeur -----
+    // ----- ETAPE 1 : trouver l'editeur -----
     let editor = null;
     try {
-      editor = await waitForEditor(5_000);
+      editor = await waitForEditor(sel.text_editor, 8_000);
     } catch {}
 
     if (!editor) {
-      // Le modal ne s'est pas ouvert automatiquement -> cliquer le bouton compose
-      const composeSels = [
-        "button[aria-label='Commencer un post']",
-        "button[aria-label='Start a post']",
-        "button[aria-label='Demarrer un post']",
-        ".share-box-feed-entry__trigger",
-        "div.share-box-feed-entry__top-bar button",
-        "div[class*='share-box'] button",
-        "div[class*='trigger'] button",
-      ].join(", ");
-
-      const btn = await waitForElement(composeSels, { timeoutMs: 8_000 }).catch(() => null);
+      // Fallback : cliquer les boutons compose via les selecteurs remote
+      const btn = await waitForElement(sel.btn_open_compose, { timeoutMs: 5_000 }).catch(() => null);
       if (btn) {
         await humanClick(btn);
         await new Promise((r) => setTimeout(r, 1500));
+      } else {
+        // Dernier essai par texte
+        clickByText(openTexts);
+        await new Promise((r) => setTimeout(r, 1500));
       }
-      editor = await waitForEditor(12_000);
+      editor = await waitForEditor(sel.text_editor, 12_000);
     }
 
-    // ----- ETAPE 2 : selectionner le compte entreprise -----
+    // ----- ETAPE 2 : selectionner puis VERIFIER le compte entreprise -----
     if (task.publish_as_name) {
-      await selectPublishingIdentity(task.publish_as_name);
+      const pickError = await selectPublishingIdentity(sel, task.publish_as_name);
+      const identity = readPublishingIdentity(sel);
+      if (!identityMatches(identity, task.publish_as_name)) {
+        return {
+          status: "failed",
+          error_code: "WRONG_IDENTITY",
+          error_message:
+            `Compositeur en tant que '${identity || "inconnu"}' au lieu de '${task.publish_as_name}'` +
+            (pickError ? ` (picker: ${pickError})` : ""),
+        };
+      }
     }
 
     // ----- ETAPE 3 : taper le texte -----
@@ -113,10 +139,7 @@ async function publishLinkedIn(task, sel) {
     // ----- ETAPE 4 : uploader un media si besoin -----
     if (task.media_urls?.length > 0) {
       await humanPause();
-      const fileInput = await waitForElement(
-        "input[type='file'][accept*='image'], input[type='file']",
-        { timeoutMs: 5_000 }
-      );
+      const fileInput = await waitForElement(sel.file_input, { timeoutMs: 5_000 });
       await uploadMediaFromUrl(
         fileInput,
         task.media_urls[0],
@@ -128,63 +151,57 @@ async function publishLinkedIn(task, sel) {
 
     // ----- ETAPE 5 : publier -----
     await humanPause();
-    const submitSel = [
-      "button.share-actions__primary-action",
-      "button[class*='share-actions__primary']",
-      "button[aria-label='Publier']",
-      "button[aria-label='Post']",
-      "button[aria-label='Partager']",
-    ].join(", ");
-    const submitBtn = await waitForElement(submitSel, { timeoutMs: 10_000 });
+    const submitBtn = await waitForElement(sel.btn_submit, { timeoutMs: 10_000 });
     await humanClick(submitBtn);
 
     // ----- ETAPE 6 : attendre la confirmation -----
-    await waitForElement("div[role='alert'], div[class*='artdeco-toast']", { timeoutMs: 30_000 });
+    await waitForElement(sel.success_toast, { timeoutMs: 30_000 });
 
     return { status: "success", post_url: null };
   } catch (err) {
-    const code = err.message.includes("not found") ? "SELECTOR_NOT_FOUND" : "UNKNOWN";
+    const code = err.message.includes("not found") || err.message.includes("Editor not found")
+      ? "SELECTOR_NOT_FOUND"
+      : "UNKNOWN";
     return { status: "failed", error_code: code, error_message: err.message };
   }
 }
 
-// Selectionner le compte entreprise dans le picker d'identite du compositeur
-async function selectPublishingIdentity(pageName) {
+// Lit le nom de l'acteur courant du compositeur (page ou profil).
+function readPublishingIdentity(sel) {
+  for (const s of sel.actor_name.split(",").map((x) => x.trim())) {
+    try {
+      const els = [...document.querySelectorAll(s)];
+      for (const el of els) {
+        if (el.offsetHeight === 0) continue;
+        const t = el.textContent.trim();
+        if (t) return t;
+      }
+    } catch {}
+  }
+  return null;
+}
+
+// Ouvre le picker d'identite et choisit la page par son nom.
+// Retourne null si OK, ou un message d'erreur — l'echec n'est plus silencieux :
+// c'est la verification d'identite en aval qui decide d'abort.
+async function selectPublishingIdentity(sel, pageName) {
   try {
-    // Trouver le bouton identity picker (montre la photo de profil actuelle)
-    const pickerSel = [
-      "button[aria-label*='Choisissez']",
-      "button[aria-label*='Choose']",
-      "button[aria-label*='identite']",
-      "button[aria-label*='identity']",
-      "div[class*='actor'] button",
-      "div[class*='identity'] button",
-      ".share-creation-state__actor-trigger",
-      "button[class*='actor']",
-    ].join(", ");
+    // Deja la bonne identite (cas page admin) : rien a faire
+    if (identityMatches(readPublishingIdentity(sel), pageName)) return null;
 
-    const pickerBtn = await waitForElement(pickerSel, { timeoutMs: 5_000 }).catch(() => null);
-
-    if (!pickerBtn) return; // pas de picker = deja le bon compte ou non supporte
+    const pickerBtn = await waitForElement(sel.identity_picker_trigger, { timeoutMs: 5_000 }).catch(() => null);
+    if (!pickerBtn) return "identity picker not found";
 
     await humanClick(pickerBtn);
     await new Promise((r) => setTimeout(r, 800));
 
-    // Chercher l'option contenant le nom de la page entreprise
-    const optionSels = [
-      "[role='option']",
-      "[role='radio']",
-      "li[class*='actor']",
-      "div[class*='actor-option']",
-      "div[class*='identity-option']",
-    ].join(", ");
+    const option = findByText(sel.identity_option, pageName);
+    if (!option) return `option '${pageName}' not found in picker`;
 
-    const option = findByText(optionSels, pageName);
-    if (option) {
-      await humanClick(option);
-      await new Promise((r) => setTimeout(r, 500));
-    }
-  } catch {
-    // Ne pas faire echouer la publication si le picker n'est pas trouve
+    await humanClick(option);
+    await new Promise((r) => setTimeout(r, 500));
+    return null;
+  } catch (err) {
+    return err.message;
   }
 }

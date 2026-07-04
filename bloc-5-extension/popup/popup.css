@@ -94,6 +94,17 @@ body {
   white-space: nowrap;
 }
 
+.current-tab {
+  font-size: 11px;
+  color: #6C63FF;
+  background: #f5f4ff;
+  border-top: 1px solid #eee;
+  padding: 6px 16px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* Stats */
 .stats {
   display: grid;

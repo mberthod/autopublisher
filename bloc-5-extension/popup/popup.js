@@ -1,19 +1,21 @@
 function $(id) { return document.getElementById(id); }
 
-// ---------- Connexion (vérification via cookies) ----------
+// ---------- Connexion ----------
 
-const PLATFORMS = {
-  linkedin:  { cookieUrl: "https://www.linkedin.com", cookieName: "li_at",    loginUrl: "https://www.linkedin.com/login" },
-  instagram: { cookieUrl: "https://www.instagram.com", cookieName: "sessionid", loginUrl: "https://www.instagram.com/accounts/login/" },
+const LOGIN_URLS = {
+  linkedin:  "https://www.linkedin.com/login",
+  instagram: "https://www.instagram.com/accounts/login/",
 };
 
-async function isConnected(platform) {
+// Demande au service-worker qui a acces aux tabs + cookies
+async function loadConnections() {
+  let status = {};
   try {
-    const cfg = PLATFORMS[platform];
-    const cookie = await chrome.cookies.get({ url: cfg.cookieUrl, name: cfg.cookieName });
-    return !!cookie;
-  } catch {
-    return false;
+    status = await chrome.runtime.sendMessage({ type: "GET_CONNECTION_STATUS" });
+  } catch { status = { linkedin: false, instagram: false }; }
+
+  for (const [platform, connected] of Object.entries(status)) {
+    renderConnection(platform, connected);
   }
 }
 
@@ -28,29 +30,48 @@ function renderConnection(platform, connected) {
     btnEl.classList.add("hidden");
     badgeEl.classList.remove("hidden");
   } else {
-    statusEl.textContent = "Non connecté";
+    statusEl.textContent = "Non connecte";
     statusEl.className   = "platform-status disconnected";
     btnEl.classList.remove("hidden");
     badgeEl.classList.add("hidden");
   }
 }
 
-async function loadConnections() {
-  for (const platform of Object.keys(PLATFORMS)) {
-    const connected = await isConnected(platform);
-    renderConnection(platform, connected);
-  }
-}
-
 // Boutons "Se connecter"
-for (const [platform, cfg] of Object.entries(PLATFORMS)) {
+for (const [platform, url] of Object.entries(LOGIN_URLS)) {
   $(`btn-${platform}`).addEventListener("click", () => {
-    chrome.tabs.create({ url: cfg.loginUrl });
-    window.close(); // ferme le popup
+    chrome.tabs.create({ url });
+    window.close();
   });
 }
 
-// ---------- Stats de la file de publication ----------
+// ---------- Onglet actif ----------
+
+async function detectCurrentTab() {
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tab?.url) return;
+    const url = new URL(tab.url);
+    const hostname = url.hostname;
+    let label = null;
+
+    if (hostname.includes("linkedin.com")) {
+      const parts = tab.title?.split(" | ") || [];
+      const name = (parts[0] || "LinkedIn").trim();
+      label = "LinkedIn · " + name.substring(0, 35);
+    } else if (hostname.includes("instagram.com")) {
+      const name = (tab.title || "Instagram").replace("• Instagram", "").trim();
+      label = "Instagram · " + name.substring(0, 35);
+    }
+
+    if (label) {
+      $("current-tab").textContent = "📍 " + label;
+      $("current-tab").classList.remove("hidden");
+    }
+  } catch {}
+}
+
+// ---------- Stats file de publication ----------
 
 async function loadStats() {
   try {
@@ -63,16 +84,16 @@ async function loadStats() {
 
     if (stats.last) {
       const t    = stats.last;
-      const when = t.doneAt ? `il y a ${Math.round((Date.now() - t.doneAt) / 60000)} min` : "";
+      const when = t.doneAt ? "il y a " + Math.round((Date.now() - t.doneAt) / 60000) + " min" : "";
       const icon = t.status === "done" ? "✓" : "✗";
-      $("last-task").textContent = `${icon} ${t.platform} — ${t.status} ${when}`.trim();
+      $("last-task").textContent = (icon + " " + t.platform + " — " + t.status + " " + when).trim();
     }
   } catch {
     $("last-task").textContent = "Service worker non disponible.";
   }
 }
 
-// ---------- Paramètres ----------
+// ---------- Parametres ----------
 
 async function loadSettings() {
   const { backendUrl } = await chrome.storage.local.get("backendUrl");
@@ -81,7 +102,7 @@ async function loadSettings() {
 
 $("btn-poll").addEventListener("click", async () => {
   $("btn-poll").disabled    = true;
-  $("btn-poll").textContent = "…";
+  $("btn-poll").textContent = "...";
   try {
     await chrome.runtime.sendMessage({ type: "FORCE_POLL" });
     await loadStats();
@@ -103,5 +124,6 @@ $("btn-save").addEventListener("click", async () => {
 
 // ---------- Init ----------
 loadConnections();
+detectCurrentTab();
 loadStats();
 loadSettings();

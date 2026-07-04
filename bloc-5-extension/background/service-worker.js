@@ -44,7 +44,34 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     getStats().then((s) => sendResponse(s));
     return true;
   }
+  if (msg.type === "GET_CONNECTION_STATUS") {
+    Promise.all([
+      checkPlatformConnection("linkedin"),
+      checkPlatformConnection("instagram"),
+    ]).then(([linkedin, instagram]) => sendResponse({ linkedin, instagram }));
+    return true;
+  }
 });
+
+const PLATFORM_CHECK = {
+  linkedin:  { urlPattern: "https://www.linkedin.com/*", loginRe: /\/(login|checkpoint|signup|uas)/, cookieUrl: "https://www.linkedin.com",  cookieName: "li_at" },
+  instagram: { urlPattern: "https://www.instagram.com/*", loginRe: /\/accounts\/(login|signup)/,    cookieUrl: "https://www.instagram.com", cookieName: "sessionid" },
+};
+
+async function checkPlatformConnection(platform) {
+  const cfg = PLATFORM_CHECK[platform];
+  // Strategie 1 : verifier les onglets ouverts (pas de permission supplementaire)
+  try {
+    const tabs = await chrome.tabs.query({ url: cfg.urlPattern });
+    if (tabs.some(t => t.url && !cfg.loginRe.test(new URL(t.url).pathname))) return true;
+  } catch {}
+  // Strategie 2 : verifier le cookie de session
+  try {
+    const cookie = await chrome.cookies.get({ url: cfg.cookieUrl, name: cfg.cookieName });
+    if (cookie) return true;
+  } catch {}
+  return false;
+}
 
 async function refreshSelectors() {
   try {

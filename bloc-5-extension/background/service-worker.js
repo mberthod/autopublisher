@@ -4,6 +4,7 @@ import { enqueue, dequeue, markDone, markFailed, getStats } from "./task-queue.j
 
 const ALARM_POLL = "poll-tasks";
 const ALARM_SELECTORS = "refresh-selectors";
+const ALARM_ANALYTICS = "scrape-analytics";
 const PLATFORM_URLS = {
   linkedin: "https://www.linkedin.com/feed/",
   instagram: "https://www.instagram.com/",
@@ -16,11 +17,21 @@ chrome.runtime.onStartup.addListener(setup);
 function setup() {
   chrome.alarms.create(ALARM_POLL, { periodInMinutes: 5 });
   chrome.alarms.create(ALARM_SELECTORS, { periodInMinutes: 360 });
+  // Daily analytics scraping at 9:00 AM
+  const now = new Date();
+  const next9AM = new Date(now);
+  next9AM.setHours(9, 0, 0, 0);
+  if (next9AM <= now) next9AM.setDate(next9AM.getDate() + 1);
+  chrome.alarms.create(ALARM_ANALYTICS, {
+    when: next9AM.getTime(),
+    periodInMinutes: 24 * 60,
+  });
 }
 
 chrome.alarms.onAlarm.addListener(async (alarm) => {
   if (alarm.name === ALARM_POLL) await pollAndProcess();
   if (alarm.name === ALARM_SELECTORS) await refreshSelectors();
+  if (alarm.name === ALARM_ANALYTICS) await scrapeAnalyticsForPublishedPosts();
 });
 
 // Allow popup to trigger an immediate poll
@@ -72,6 +83,25 @@ async function processNext() {
     return;
   }
 
+  // Pre-fetch media bytes in the service worker context to bypass
+  // Private Network Access restrictions in content scripts.
+  const mediaData = [];
+  for (const url of task.media_urls || []) {
+    try {
+      const r = await fetch(url);
+      if (r.ok) {
+        const buffer = await r.arrayBuffer();
+        mediaData.push({
+          name: url.split('/').pop().split('?')[0] || 'media.png',
+          type: r.headers.get('content-type') || 'image/png',
+          bytes: Array.from(new Uint8Array(buffer)),
+        });
+      }
+    } catch (e) {
+      console.warn('[SW] media prefetch failed', url, e.message);
+    }
+  }
+
   let tab;
   try {
     tab = await chrome.tabs.create({ url: platformUrl, active: false });
@@ -79,7 +109,7 @@ async function processNext() {
 
     const result = await chrome.tabs.sendMessage(tab.id, {
       type: "PUBLISH_POST",
-      task,
+      task: { ...task, media_data: mediaData },
       selectors: selectors.platforms[task.platform],
     });
 
@@ -122,3 +152,47 @@ function waitForTabLoad(tabId, timeoutMs = 30_000) {
     chrome.tabs.onUpdated.addListener(onUpdated);
   });
 }
+async function scrapeAnalyticsForPublishedPosts() {
+  const base = await (async () => {
+    return new Promise(r => chrome.storage.local.get("backendUrl", d => r(d.backendUrl || "http://192.168.0.176:8000")));
+  })();
+
+  let posts = [];
+  try {
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const dateStr = yesterday.toISOString().split("T")[0];
+    const r = await fetch(`${base}/api/v1/posts?status=published&scheduled_for_date=${dateStr}`);
+    posts = await r.json();
+  } catch (e) {
+    console.warn("[SW] analytics: could not fetch published posts", e.message);
+    return;
+  }
+
+  for (const post of posts) {
+    if (!post.published_url) continue;
+    let tab;
+    try {
+      tab = await chrome.tabs.create({ url: post.published_url, active: false });
+      await waitForTabLoad(tab.id);
+      const metrics = await chrome.tabs.sendMessage(tab.id, {
+        action: "scrapeAnalytics",
+        platform: post.platform,
+      });
+      if (metrics) {
+        await fetch(`${base}/api/v1/posts/${post.id}/metrics`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(metrics),
+        });
+      }
+    } catch (e) {
+      console.warn("[SW] analytics scrape failed for", post.id, e.message);
+    } finally {
+      if (tab?.id) { try { await chrome.tabs.remove(tab.id); } catch (_) {} }
+    }
+    // Pause between posts to avoid rate limiting
+    await new Promise(r => setTimeout(r, 5000));
+  }
+}
+

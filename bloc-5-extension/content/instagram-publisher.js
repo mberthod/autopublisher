@@ -39,7 +39,7 @@ async function publishInstagram(task, sel) {
       return { status: "failed", error_code: "UNKNOWN", error_message: "Instagram requires at least one image" };
     }
 
-    await uploadMediaFromUrl(fileInput, task.media_urls[0], `post_${task.post_id}.png`);
+    await uploadMediaFromUrl(fileInput, task.media_urls[0], `post_${task.post_id}.png`, task.media_data?.[0] ?? null);
     await humanPause();
 
     // Next → Next → Caption
@@ -67,3 +67,4 @@ async function publishInstagram(task, sel) {
     return { status: "failed", error_code: code, error_message: err.message };
   }
 }
+

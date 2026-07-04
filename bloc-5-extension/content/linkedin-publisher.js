@@ -42,7 +42,7 @@ async function publishLinkedIn(task, sel) {
     if (task.media_urls?.length > 0) {
       await humanPause();
       const fileInput = await waitForElement(sel.file_input, { timeoutMs: 5_000 });
-      await uploadMediaFromUrl(fileInput, task.media_urls[0], `post_${task.post_id}.png`);
+      await uploadMediaFromUrl(fileInput, task.media_urls[0], `post_${task.post_id}.png`, task.media_data?.[0] ?? null);
       await humanPause();
     }
 
@@ -60,3 +60,4 @@ async function publishLinkedIn(task, sel) {
     return { status: "failed", error_code: code, error_message: err.message };
   }
 }
+

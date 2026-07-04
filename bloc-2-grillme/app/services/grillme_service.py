@@ -5,29 +5,20 @@ from fastapi import HTTPException
 from loguru import logger
 from sqlalchemy.orm import Session
 
-from app.agents.interrogator_agent import InterrogatorAgent, MATRIX_FIELDS, FIELD_QUESTIONS
+from app.agents.interrogator_agent import InterrogatorAgent
 from app.agents.strategist_agent import StrategistAgent
 from app.models import GrilledMeSession, Persona
 from app.services import persona_service
 
-
-def _next_field(matrix: dict) -> Optional[str]:
-    for f in MATRIX_FIELDS:
-        if not matrix.get(f):
-            return f
-    return None
-
-
-def _progress(matrix: dict) -> float:
-    filled = sum(1 for f in MATRIX_FIELDS if matrix.get(f))
-    return round(filled / len(MATRIX_FIELDS), 2)
+MAX_EXCHANGES = 12
 
 
 def start_session(db: Session, bu: str, interrogator: Optional[InterrogatorAgent] = None) -> tuple[str, str]:
     if interrogator is None:
         interrogator = InterrogatorAgent()
 
-    first_question = interrogator.get_first_question(bu)
+    result = interrogator.start_session(bu)
+    first_question = result["next_question"]
 
     session = GrilledMeSession(
         bu=bu,
@@ -35,7 +26,6 @@ def start_session(db: Session, bu: str, interrogator: Optional[InterrogatorAgent
         transcript=[{
             "role": "assistant",
             "content": first_question,
-            "field": "cible",
             "timestamp": datetime.utcnow().isoformat(),
         }],
         status="in_progress",
@@ -68,31 +58,37 @@ def handle_message(
     matrix = dict(session.matrix)
     transcript = list(session.transcript)
 
-    # Determine which field the last assistant question was about
-    current_field = _next_field(matrix)
-    if not current_field:
-        raise HTTPException(status_code=400, detail="All fields already filled")
+    # Hard cap on exchanges
+    exchange_count = sum(1 for t in transcript if t.get("role") == "user")
+    if exchange_count >= MAX_EXCHANGES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Maximum de {MAX_EXCHANGES} échanges atteint. Démarrez une nouvelle session."
+        )
 
-    logger.bind(session_id=session_id, field=current_field).info(f"Handling message: {user_message[:50]}")
+    # Add user message to transcript
+    transcript.append({
+        "role": "user",
+        "content": user_message,
+        "timestamp": datetime.utcnow().isoformat(),
+    })
 
-    # Extract and store the value for the current field
-    value = interrogator.extract_field_value(session.bu, current_field, user_message)
-    matrix[current_field] = value
+    # Call the LLM agent
+    result = interrogator.process_message(session.bu, matrix, transcript, user_message)
 
-    transcript.append({"role": "user", "content": user_message, "timestamp": datetime.utcnow().isoformat()})
+    # Update matrix with extracted values
+    for field, value in (result.get("matrix_update") or {}).items():
+        if value and str(value).strip():
+            matrix[field] = value
 
-    # Determine next field
-    next_field = _next_field(matrix)
-    is_complete = next_field is None
-    progress = _progress(matrix)
+    is_complete = result.get("is_complete", False)
+    next_question = result.get("next_question")
+    progress = float(result.get("matrix_progress", 0.0))
 
-    next_question = None
-    if not is_complete:
-        next_question = FIELD_QUESTIONS[next_field]
+    if next_question:
         transcript.append({
             "role": "assistant",
             "content": next_question,
-            "field": next_field,
             "timestamp": datetime.utcnow().isoformat(),
         })
 
@@ -118,6 +114,10 @@ def handle_message(
 
     db.commit()
     db.refresh(session)
+
+    # Determine which field is currently being filled (for UI progress)
+    MATRIX_FIELDS = ["cible", "besoins", "frustrations", "charte"]
+    current_field = next((f for f in MATRIX_FIELDS if not matrix.get(f)), None)
 
     return {
         "next_question": next_question,

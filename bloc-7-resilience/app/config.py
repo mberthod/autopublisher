@@ -17,5 +17,9 @@ class Settings(BaseSettings):
     queue_jitter_factor: float = 0.2
     queue_stuck_threshold_minutes: int = 5
 
+    bloc1_api_url: str = "http://localhost:8000"
+    generation_service_url: str = "http://localhost:8003"
+
 
 settings = Settings()
+

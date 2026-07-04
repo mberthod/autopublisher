@@ -1,11 +1,18 @@
 /**
  * Injects a media blob into a hidden <input type="file"> element.
- * Downloads the file from a URL, converts to Blob, uses DataTransfer.
+ * If mediaData (pre-fetched bytes) is provided, uses those directly.
+ * Otherwise downloads from url (only works if CORS/PNA allows it).
  */
-export async function uploadMediaFromUrl(fileInput, url, filename = "media.png") {
-  const response = await fetch(url);
-  if (!response.ok) throw new Error(`media download failed: HTTP ${response.status}`);
-  const blob = await response.blob();
+export async function uploadMediaFromUrl(fileInput, url, filename = "media.png", mediaData = null) {
+  let blob;
+  if (mediaData) {
+    blob = new Blob([new Uint8Array(mediaData.bytes)], { type: mediaData.type || "image/png" });
+    filename = mediaData.name || filename;
+  } else {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`media download failed: HTTP ${response.status}`);
+    blob = await response.blob();
+  }
 
   const file = new File([blob], filename, { type: blob.type || "image/png" });
   const dt = new DataTransfer();

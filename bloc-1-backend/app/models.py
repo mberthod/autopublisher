@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Text, DateTime, JSON, ForeignKey
+from sqlalchemy import Column, String, Text, DateTime, JSON, ForeignKey, Integer
 from sqlalchemy.orm import declarative_base, relationship
 import uuid
 from datetime import datetime
@@ -63,3 +63,18 @@ class Post(Base):
 
     planning = relationship("Planning", back_populates="posts")
     persona = relationship("Persona")
+    metrics = relationship("PostMetrics", back_populates="post", cascade="all, delete-orphan")
+
+
+class PostMetrics(Base):
+    __tablename__ = "post_metrics"
+
+    id = Column(String, primary_key=True, default=gen_uuid)
+    post_id = Column(String, ForeignKey("posts.id", ondelete="CASCADE"), nullable=False)
+    likes = Column(Integer, default=0)
+    comments = Column(Integer, default=0)
+    reposts = Column(Integer, default=0)
+    views = Column(Integer, default=0)
+    scraped_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    post = relationship("Post", back_populates="metrics")

@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
 
 from app.api import health_routes, persona_routes, planning_routes, post_routes
-from app.api import task_routes, selector_routes
+from app.api import task_routes, selector_routes, stats_routes
 from app.config import settings
 from app.db import init_db
 
@@ -31,6 +31,8 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:5173",
         "http://192.168.0.176:5173",
+        "http://localhost:5174",
+        "http://192.168.0.176:5174",
         "http://127.0.0.1:5173",
     ],
     allow_credentials=True,
@@ -44,3 +46,5 @@ app.include_router(planning_routes.router, prefix="/api/v1/plannings", tags=["pl
 app.include_router(post_routes.router, prefix="/api/v1/posts", tags=["posts"])
 app.include_router(task_routes.router, prefix="/api/v1/tasks", tags=["tasks"])
 app.include_router(selector_routes.router, prefix="/api/v1/selectors", tags=["selectors"])
+app.include_router(stats_routes.router, prefix="/api/v1/stats", tags=["stats"])
+

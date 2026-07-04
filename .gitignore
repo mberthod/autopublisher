@@ -10,3 +10,9 @@
 **/data/saas_rse.db
 **/data/test_*.db
 **/.env
+
+# Data files
+**/data/posts/*
+**/data/carousels/*
+**/node_modules/
+CLAUDE_INSTRUCTIONS.md

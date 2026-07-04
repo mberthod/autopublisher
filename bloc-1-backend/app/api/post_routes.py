@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.db import get_db
 from app.schemas import PostCreate, PostRead, PostUpdate
+from app.models import PostMetrics
 from app.services import post_service
 
 router = APIRouter()
@@ -51,3 +52,44 @@ def update_post(post_id: str, data: PostUpdate, db: Session = Depends(get_db)):
 @router.delete("/{post_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_post(post_id: str, db: Session = Depends(get_db)):
     post_service.delete(db, post_id)
+
+@router.post("/{post_id}/metrics", status_code=201)
+def add_post_metrics(
+    post_id: str,
+    data: dict,
+    db: Session = Depends(get_db),
+):
+    post_service.get_by_id(db, post_id)  # 404 if not found
+    metric = PostMetrics(
+        post_id=post_id,
+        likes=data.get("likes", 0),
+        comments=data.get("comments", 0),
+        reposts=data.get("reposts", 0),
+        views=data.get("views", 0),
+    )
+    db.add(metric)
+    db.commit()
+    return {"ok": True}
+
+
+@router.get("/{post_id}/metrics")
+def get_post_metrics(post_id: str, db: Session = Depends(get_db)):
+    post_service.get_by_id(db, post_id)  # 404 if not found
+    rows = (
+        db.query(PostMetrics)
+        .filter(PostMetrics.post_id == post_id)
+        .order_by(PostMetrics.scraped_at.desc())
+        .all()
+    )
+    return [
+        {
+            "id": r.id,
+            "likes": r.likes,
+            "comments": r.comments,
+            "reposts": r.reposts,
+            "views": r.views,
+            "scraped_at": r.scraped_at.isoformat(),
+        }
+        for r in rows
+    ]
+

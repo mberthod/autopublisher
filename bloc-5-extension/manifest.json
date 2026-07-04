@@ -8,7 +8,8 @@
     "storage",
     "tabs",
     "scripting",
-    "offscreen"
+    "offscreen",
+    "cookies"
   ],
   "host_permissions": [
     "https://www.linkedin.com/*",

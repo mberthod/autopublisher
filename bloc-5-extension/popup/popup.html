@@ -11,32 +11,66 @@
     <span class="title">Publisher</span>
   </div>
 
-  <div class="stats">
-    <div class="stat">
-      <div class="stat-value" id="stat-pending">—</div>
-      <div class="stat-label">en attente</div>
-    </div>
-    <div class="stat">
-      <div class="stat-value" id="stat-running">—</div>
-      <div class="stat-label">en cours</div>
-    </div>
-    <div class="stat">
-      <div class="stat-value" id="stat-done">—</div>
-      <div class="stat-label">publiés</div>
-    </div>
-    <div class="stat">
-      <div class="stat-value" id="stat-failed">—</div>
-      <div class="stat-label">échecs</div>
-    </div>
-  </div>
+  <!-- Comptes -->
+  <section class="section">
+    <div class="section-title">Comptes</div>
 
-  <div class="last-task" id="last-task">Aucune tâche récente.</div>
+    <div class="account-row">
+      <div class="account-info">
+        <span class="platform-icon li">in</span>
+        <div>
+          <div class="platform-name">LinkedIn</div>
+          <div class="platform-status" id="status-linkedin">Vérification…</div>
+        </div>
+      </div>
+      <button class="btn-connect hidden" id="btn-linkedin">Se connecter</button>
+      <span class="badge-ok hidden" id="badge-linkedin">✓ Connecté</span>
+    </div>
 
+    <div class="account-row">
+      <div class="account-info">
+        <span class="platform-icon ig">ig</span>
+        <div>
+          <div class="platform-name">Instagram</div>
+          <div class="platform-status" id="status-instagram">Vérification…</div>
+        </div>
+      </div>
+      <button class="btn-connect hidden" id="btn-instagram">Se connecter</button>
+      <span class="badge-ok hidden" id="badge-instagram">✓ Connecté</span>
+    </div>
+  </section>
+
+  <!-- Stats publication -->
+  <section class="section border-top">
+    <div class="section-title">File de publication</div>
+    <div class="stats">
+      <div class="stat">
+        <div class="stat-value" id="stat-pending">—</div>
+        <div class="stat-label">en attente</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value" id="stat-running">—</div>
+        <div class="stat-label">en cours</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value" id="stat-done">—</div>
+        <div class="stat-label">publiés</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value" id="stat-failed">—</div>
+        <div class="stat-label">échecs</div>
+      </div>
+    </div>
+    <div class="last-task" id="last-task">Aucune tâche récente.</div>
+  </section>
+
+  <!-- Actions -->
   <div class="actions">
-    <button id="btn-poll" class="btn-primary">Vérifier maintenant</button>
-    <button id="btn-settings" class="btn-secondary">Paramètres</button>
+    <button id="btn-poll" class="btn-primary">▶ Publier maintenant</button>
+    <button id="btn-settings" class="btn-icon" title="Paramètres">⚙</button>
   </div>
 
+  <!-- Paramètres -->
   <div class="settings-panel hidden" id="settings-panel">
     <label for="backend-url">URL backend</label>
     <input id="backend-url" type="text" placeholder="http://192.168.0.176:8000" />

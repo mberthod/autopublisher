@@ -42,13 +42,24 @@ export async function typeText(element, text) {
 
 export async function humanClick(element) {
   await humanPause();
-  element.scrollIntoView({ behavior: "smooth", block: "center" });
+  // Le selecteur peut matcher une icone <svg>/<span> non cliquable : remonter
+  // au conteneur interactif reel (bouton/lien) qui porte le handler.
+  const target =
+    element.closest?.('button, a, [role="button"], [role="menuitem"], [role="tab"], label, [tabindex]') ||
+    element;
+  target.scrollIntoView({ behavior: "smooth", block: "center" });
   await sleep(randomBetween(300, 600));
-  element.dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
+  const opts = { bubbles: true, cancelable: true, view: window };
+  target.dispatchEvent(new MouseEvent("mouseover", opts));
   await sleep(randomBetween(100, 300));
-  element.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+  target.dispatchEvent(new MouseEvent("mousedown", opts));
   await sleep(randomBetween(50, 150));
-  element.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
-  element.click();
+  target.dispatchEvent(new MouseEvent("mouseup", opts));
+  // MouseEvent('click') fonctionne sur tout Element (y compris SVG), contrairement
+  // a HTMLElement.click() qui n'existe pas sur les SVG.
+  target.dispatchEvent(new MouseEvent("click", opts));
+  if (typeof target.click === "function") {
+    try { target.click(); } catch {}
+  }
   await sleep(randomBetween(300, 600));
 }

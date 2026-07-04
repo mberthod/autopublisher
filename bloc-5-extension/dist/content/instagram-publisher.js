@@ -54,14 +54,22 @@
   }
   async function humanClick(element) {
     await humanPause();
-    element.scrollIntoView({ behavior: "smooth", block: "center" });
+    const target = element.closest?.('button, a, [role="button"], [role="menuitem"], [role="tab"], label, [tabindex]') || element;
+    target.scrollIntoView({ behavior: "smooth", block: "center" });
     await sleep(randomBetween(300, 600));
-    element.dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
+    const opts = { bubbles: true, cancelable: true, view: window };
+    target.dispatchEvent(new MouseEvent("mouseover", opts));
     await sleep(randomBetween(100, 300));
-    element.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+    target.dispatchEvent(new MouseEvent("mousedown", opts));
     await sleep(randomBetween(50, 150));
-    element.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
-    element.click();
+    target.dispatchEvent(new MouseEvent("mouseup", opts));
+    target.dispatchEvent(new MouseEvent("click", opts));
+    if (typeof target.click === "function") {
+      try {
+        target.click();
+      } catch {
+      }
+    }
     await sleep(randomBetween(300, 600));
   }
 
@@ -99,23 +107,46 @@
     );
     return true;
   });
+  async function clickButtonByText(texts, fallbackSel, timeoutMs = 1e4) {
+    const deadline = Date.now() + timeoutMs;
+    const needles = texts.map((t) => t.toLowerCase());
+    while (Date.now() < deadline) {
+      const candidates = document.querySelectorAll("div[role='button'], button, [role='button'] div");
+      for (const el of candidates) {
+        if (el.offsetHeight === 0) continue;
+        const t = el.textContent.trim().toLowerCase();
+        if (t && t.length < 20 && needles.some((n) => t === n || t.includes(n))) {
+          await humanClick(el);
+          return true;
+        }
+      }
+      await new Promise((r) => setTimeout(r, 400));
+    }
+    const btn = await waitForElement(fallbackSel, { timeoutMs: 3e3 }).catch(() => null);
+    if (btn) {
+      await humanClick(btn);
+      return true;
+    }
+    return false;
+  }
   async function publishInstagram(task, sel) {
     const navCheck = document.querySelector("nav, a[href='/']");
     if (!navCheck) {
       return { status: "failed", error_code: "AUTH_REQUIRED", error_message: "Not logged into Instagram" };
     }
     try {
-      const newPostBtn = await waitForElement(sel.btn_new_post, { timeoutMs: 1e4 });
-      await humanClick(newPostBtn);
-      const fileInput = await waitForElement(sel.file_input, { timeoutMs: 1e4 });
       if (!task.media_urls?.length) {
         return { status: "failed", error_code: "UNKNOWN", error_message: "Instagram requires at least one image" };
       }
+      const newPostBtn = await waitForElement(sel.btn_new_post, { timeoutMs: 1e4 });
+      await humanClick(newPostBtn);
+      await humanPause();
+      const fileInput = await waitForElement(sel.file_input, { timeoutMs: 1e4 });
       await uploadMediaFromUrl(fileInput, task.media_urls[0], `post_${task.post_id}.png`, task.media_data?.[0] ?? null);
       await humanPause();
       for (let i = 0; i < 2; i++) {
-        const nextBtn = await waitForElement(sel.next_button, { timeoutMs: 1e4 });
-        await humanClick(nextBtn);
+        const ok = await clickButtonByText(["suivant", "next"], sel.next_button, 12e3);
+        if (!ok) return { status: "failed", error_code: "SELECTOR_NOT_FOUND", error_message: `Bouton 'Suivant' introuvable (etape ${i + 1})` };
         await humanPause();
       }
       if (task.text) {
@@ -124,8 +155,8 @@
         await typeText(caption, task.text);
       }
       await humanPause();
-      const shareBtn = await waitForElement(sel.share_button, { timeoutMs: 1e4 });
-      await humanClick(shareBtn);
+      const shared = await clickButtonByText(["partager", "share"], sel.share_button, 12e3);
+      if (!shared) return { status: "failed", error_code: "SELECTOR_NOT_FOUND", error_message: "Bouton 'Partager' introuvable" };
       const confirmed = await waitForElement(sel.success_indicator, { timeoutMs: 3e4 }).catch(() => null);
       if (!confirmed) {
         return {

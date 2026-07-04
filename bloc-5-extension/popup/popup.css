@@ -64,6 +64,7 @@ body {
 }
 .platform-icon.li { background: #0077B5; }
 .platform-icon.ig { background: linear-gradient(135deg, #f09433, #e6683c, #dc2743, #cc2366, #bc1888); }
+.platform-icon.fb { background: #1877F2; }
 .platform-name { font-weight: 600; font-size: 13px; }
 .platform-status { font-size: 11px; color: #888; margin-top: 1px; }
 .platform-status.connected { color: #22c55e; font-weight: 500; }

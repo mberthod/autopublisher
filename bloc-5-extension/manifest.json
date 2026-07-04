@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "SaaS RSE Publisher",
   "version": "0.1.0",
-  "description": "Publishes pre-generated posts to LinkedIn and Instagram",
+  "description": "Publishes pre-generated posts to LinkedIn, Instagram and Facebook (Meta Business Suite)",
   "permissions": [
     "alarms",
     "storage",
@@ -14,6 +14,8 @@
   "host_permissions": [
     "https://www.linkedin.com/*",
     "https://www.instagram.com/*",
+    "https://business.facebook.com/*",
+    "https://www.facebook.com/*",
     "http://localhost:*/*",
     "http://192.168.0.176:*/*"
   ],
@@ -38,6 +40,16 @@
       ],
       "js": [
         "dist/content/instagram-publisher.js"
+      ],
+      "run_at": "document_idle",
+      "all_frames": false
+    },
+    {
+      "matches": [
+        "https://business.facebook.com/*"
+      ],
+      "js": [
+        "dist/content/meta-suite-publisher.js"
       ],
       "run_at": "document_idle",
       "all_frames": false

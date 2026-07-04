@@ -186,7 +186,75 @@ SELECTORS: dict[str, dict] = {
     },
 }
 
-LATEST_VERSION = "2026-07-04-v4"
+# v5 = v4 + section meta_suite (Meta Business Suite : pages Facebook + comptes
+# Instagram pro). DOM Meta obfusque : selecteurs bases sur aria-label/role
+# FR+EN, a affiner lors de la recette manuelle.
+SELECTORS["2026-07-04-v5"] = {
+    "version": "2026-07-04-v5",
+    "updated_at": "2026-07-04T20:00:00Z",
+    "min_extension_version": "0.1.0",
+    "platforms": {
+        **SELECTORS["2026-07-04-v4"]["platforms"],
+        "meta_suite": {
+            "account_switcher_trigger": (
+                "div[role='button'][aria-label*='compte'], "
+                "div[role='button'][aria-label*='account'], "
+                "div[aria-label='Changer de compte'], "
+                "div[aria-label='Switch account']"
+            ),
+            "account_option": (
+                "div[role='dialog'] div[role='button'], "
+                "div[role='listbox'] div[role='option'], "
+                "[role='menuitem']"
+            ),
+            "active_account_name": (
+                "div[role='banner'] div[role='button'] span, "
+                "div[aria-label*='Changer de compte'] span, "
+                "div[aria-label*='Switch account'] span"
+            ),
+            "btn_create_post": (
+                "div[role='button'][aria-label*='Créer une publication'], "
+                "div[role='button'][aria-label*='Create post'], "
+                "a[href*='/composer'], "
+                "div[role='button'][aria-label*='Créer'], "
+                "div[role='button'][aria-label*='Create']"
+            ),
+            "placement_option_facebook": (
+                "div[role='checkbox'][aria-label*='Facebook'], "
+                "input[type='checkbox'][aria-label*='Facebook']"
+            ),
+            "placement_option_instagram": (
+                "div[role='checkbox'][aria-label*='Instagram'], "
+                "input[type='checkbox'][aria-label*='Instagram']"
+            ),
+            "text_editor": (
+                "div[role='textbox'][contenteditable='true'], "
+                "div[contenteditable='true'][data-lexical-editor], "
+                "div[contenteditable='true']"
+            ),
+            "file_input": "input[type='file'][accept*='image'], input[type='file']",
+            "btn_add_media": (
+                "div[role='button'][aria-label*='photo'], "
+                "div[role='button'][aria-label*='Photo'], "
+                "div[role='button'][aria-label*='média'], "
+                "div[role='button'][aria-label*='media']"
+            ),
+            "btn_publish": (
+                "div[role='button'][aria-label='Publier'], "
+                "div[role='button'][aria-label='Publish'], "
+                "div[aria-label='Publier'][tabindex='0'], "
+                "div[aria-label='Publish'][tabindex='0']"
+            ),
+            "success_indicator": (
+                "div[role='alert'], "
+                "div[aria-label*='publiée'], "
+                "div[aria-label*='published']"
+            ),
+        },
+    },
+}
+
+LATEST_VERSION = "2026-07-04-v5"
 
 
 @router.get("/latest")

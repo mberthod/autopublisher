@@ -214,8 +214,16 @@ def test_selectors_v4_identity_keys(client):
 
 
 def test_selectors_old_versions_still_served(client):
-    for version in ("2026-07-01-v1", "2026-07-04-v2", "2026-07-04-v3"):
+    for version in ("2026-07-01-v1", "2026-07-04-v2", "2026-07-04-v3", "2026-07-04-v4"):
         assert client.get(f"/api/v1/selectors/{version}").status_code == 200
+
+
+def test_selectors_v5_meta_suite(client):
+    ms = client.get("/api/v1/selectors/latest").json()["platforms"]["meta_suite"]
+    for key in ("account_switcher_trigger", "active_account_name", "btn_create_post",
+                "placement_option_facebook", "placement_option_instagram",
+                "text_editor", "file_input", "btn_publish", "success_indicator"):
+        assert key in ms, f"missing {key} in meta_suite selectors"
 
 
 def test_selectors_by_version(client):

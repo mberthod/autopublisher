@@ -5,11 +5,12 @@ function $(id) { return document.getElementById(id); }
 const LOGIN_URLS = {
   linkedin:  "https://www.linkedin.com/login",
   instagram: "https://www.instagram.com/accounts/login/",
+  meta_suite: "https://business.facebook.com/latest/home",
 };
 
 // Demande au service-worker qui a acces aux tabs + cookies
 async function loadConnections() {
-  const fallback = { linkedin: false, instagram: false };
+  const fallback = { linkedin: false, instagram: false, meta_suite: false };
   let status = fallback;
   try {
     const result = await chrome.runtime.sendMessage({ type: "GET_CONNECTION_STATUS" });
@@ -26,6 +27,7 @@ function renderConnection(platform, connected) {
   const statusEl = $(`status-${platform}`);
   const btnEl    = $(`btn-${platform}`);
   const badgeEl  = $(`badge-${platform}`);
+  if (!statusEl || !btnEl || !badgeEl) return;
 
   if (connected) {
     statusEl.textContent = "Session active";

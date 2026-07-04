@@ -4,6 +4,7 @@ await esbuild.build({
   entryPoints: [
     "content/linkedin-publisher.js",
     "content/instagram-publisher.js",
+    "content/meta-suite-publisher.js",
     "content/analytics-scraper.js",
   ],
   bundle: true,

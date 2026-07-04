@@ -30,7 +30,8 @@
         "content/linkedin-publisher.js"
       ],
       "run_at": "document_idle",
-      "all_frames": false
+      "all_frames": false,
+      "type": "module"
     },
     {
       "matches": [
@@ -40,7 +41,8 @@
         "content/instagram-publisher.js"
       ],
       "run_at": "document_idle",
-      "all_frames": false
+      "all_frames": false,
+      "type": "module"
     },
     {
       "matches": [
@@ -50,7 +52,8 @@
         "content/analytics-scraper.js"
       ],
       "run_at": "document_idle",
-      "all_frames": false
+      "all_frames": false,
+      "type": "module"
     },
     {
       "matches": [
@@ -60,7 +63,8 @@
         "content/analytics-scraper.js"
       ],
       "run_at": "document_idle",
-      "all_frames": false
+      "all_frames": false,
+      "type": "module"
     }
   ],
   "action": {

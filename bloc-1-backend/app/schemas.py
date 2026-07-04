@@ -2,6 +2,10 @@ from pydantic import BaseModel, Field, ConfigDict
 from typing import Literal, Optional
 from datetime import datetime
 
+# Alias centralises — seul point de changement pour ajouter une plateforme
+Platform = Literal["linkedin", "instagram", "facebook", "tiktok"]
+AccountKind = Literal["personal", "company_page", "business_account"]
+
 
 # --- Persona ---
 
@@ -12,8 +16,6 @@ class PersonaCreate(BaseModel):
     frustrations: str = Field(..., min_length=10)
     cible: str = Field(..., min_length=10)
     charte_branding: dict
-    linkedin_page_url: Optional[str] = None
-    instagram_page_url: Optional[str] = None
 
 
 class PersonaUpdate(BaseModel):
@@ -23,8 +25,6 @@ class PersonaUpdate(BaseModel):
     frustrations: Optional[str] = None
     cible: Optional[str] = None
     charte_branding: Optional[dict] = None
-    linkedin_page_url: Optional[str] = None
-    instagram_page_url: Optional[str] = None
 
 
 class PersonaRead(BaseModel):
@@ -39,6 +39,42 @@ class PersonaRead(BaseModel):
     charte_branding: dict
     linkedin_page_url: Optional[str] = None
     instagram_page_url: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+
+
+# --- Account (cible de publication : page entreprise, compte pro, profil) ---
+
+class AccountCreate(BaseModel):
+    persona_id: str
+    platform: Platform
+    kind: AccountKind = "personal"
+    page_url: Optional[str] = None
+    identity_name: Optional[str] = None
+    asset_id: Optional[str] = None
+    enabled: bool = True
+
+
+class AccountUpdate(BaseModel):
+    platform: Optional[Platform] = None
+    kind: Optional[AccountKind] = None
+    page_url: Optional[str] = None
+    identity_name: Optional[str] = None
+    asset_id: Optional[str] = None
+    enabled: Optional[bool] = None
+
+
+class AccountRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    persona_id: str
+    platform: str
+    kind: str
+    page_url: Optional[str] = None
+    identity_name: Optional[str] = None
+    asset_id: Optional[str] = None
+    enabled: bool
     created_at: datetime
     updated_at: datetime
 
@@ -76,9 +112,10 @@ class PlanningWithPostsRead(PlanningRead):
 class PostCreate(BaseModel):
     planning_id: str
     persona_id: str
-    platform: Literal["linkedin", "instagram"]
+    platform: Platform
     angle_editorial: str = Field(..., min_length=10)
     format: Literal["text_only", "image", "carousel"]
+    account_id: Optional[str] = None
 
 
 class PostUpdate(BaseModel):
@@ -91,6 +128,7 @@ class PostUpdate(BaseModel):
     published_url: Optional[str] = None
     error_code: Optional[str] = None
     error_message: Optional[str] = None
+    account_id: Optional[str] = None
 
 
 class PostRead(BaseModel):
@@ -111,6 +149,7 @@ class PostRead(BaseModel):
     published_url: Optional[str]
     error_code: Optional[str]
     error_message: Optional[str]
+    account_id: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 

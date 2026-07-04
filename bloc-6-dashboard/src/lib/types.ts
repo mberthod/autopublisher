@@ -1,7 +1,21 @@
-export type Platform = 'linkedin' | 'instagram';
+export type Platform = 'linkedin' | 'instagram' | 'facebook' | 'tiktok';
 export type PostFormat = 'text_only' | 'image' | 'carousel';
 export type PostStatus = 'draft' | 'validated' | 'scheduled' | 'published' | 'failed';
 export type BU = 'noisyless' | 'afluxo' | 'mbhrep';
+export type AccountKind = 'personal' | 'company_page' | 'business_account';
+
+export interface Account {
+  id: string;
+  persona_id: string;
+  platform: Platform;
+  kind: AccountKind;
+  page_url: string | null;
+  identity_name: string | null;
+  asset_id: string | null;
+  enabled: boolean;
+  created_at: string;
+  updated_at: string;
+}
 
 export interface Persona {
   id: string;
@@ -42,6 +56,7 @@ export interface Post {
   published_url: string | null;
   error_code: string | null;
   error_message: string | null;
+  account_id: string | null;
   created_at: string;
   updated_at: string;
 }

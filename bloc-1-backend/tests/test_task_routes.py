@@ -9,12 +9,17 @@ from app.db import get_db, init_db
 from app.models import Base, Persona, Planning, Post
 
 
+_Session = None
+
+
 @pytest.fixture
 def client(tmp_path):
+    global _Session
     db_path = tmp_path / "test.db"
     engine = create_engine(f"sqlite:///{db_path}", connect_args={"check_same_thread": False})
     Base.metadata.create_all(engine)
     Session = sessionmaker(bind=engine)
+    _Session = Session
 
     def override_db():
         db = Session()
@@ -56,6 +61,27 @@ def client(tmp_path):
         yield c
 
     app.dependency_overrides.clear()
+
+
+@pytest.fixture
+def seed_instagram_post(client):
+    db = _Session()
+    db.add(Post(
+        id="post_ig", planning_id="pl1", persona_id="p1",
+        platform="instagram", format="image", angle_editorial="test ig",
+        text="Hello Instagram!", image_url="http://x/img.png", status="scheduled",
+        scheduled_for=datetime(2025, 1, 1),
+    ))
+    db.commit()
+    db.close()
+
+
+def _set_legacy_page_url(client, persona_id, url):
+    db = _Session()
+    persona = db.query(Persona).filter(Persona.id == persona_id).first()
+    persona.linkedin_page_url = url
+    db.commit()
+    db.close()
 
 
 def test_get_pending_tasks_returns_scheduled(client):
@@ -108,15 +134,61 @@ def test_callback_not_found(client):
 
 
 def test_pending_task_company_page(client):
-    # Persona avec page entreprise LinkedIn → la task porte page_url + publish_as_name
-    r = client.patch("/api/v1/personas/p1", json={
-        "linkedin_page_url": "https://www.linkedin.com/company/noisyless/admin/"
+    # Account page entreprise LinkedIn → la task porte page_url + publish_as_name
+    r = client.post("/api/v1/accounts", json={
+        "persona_id": "p1",
+        "platform": "linkedin",
+        "kind": "company_page",
+        "page_url": "https://www.linkedin.com/company/noisyless/admin/",
+        "identity_name": "Noisyless",
     })
-    assert r.status_code == 200
+    assert r.status_code == 201
     r2 = client.get("/api/v1/tasks/pending")
     t = r2.json()["tasks"][0]
     assert t["page_url"] == "https://www.linkedin.com/company/noisyless/admin/"
     assert t["publish_as_name"] == "Noisyless"
+    assert t["publish_via"] == "linkedin"
+    assert t["account_kind"] == "company_page"
+
+
+def test_pending_task_instagram_business_routes_meta_suite(client, seed_instagram_post):
+    r = client.post("/api/v1/accounts", json={
+        "persona_id": "p1",
+        "platform": "instagram",
+        "kind": "business_account",
+        "page_url": "https://www.instagram.com/noisyless/",
+        "identity_name": "noisyless",
+        "asset_id": "1234567890",
+    })
+    assert r.status_code == 201
+    tasks = client.get("/api/v1/tasks/pending").json()["tasks"]
+    t = next(x for x in tasks if x["platform"] == "instagram")
+    assert t["publish_via"] == "meta_suite"
+    assert t["placements"] == ["instagram"]
+    assert t["asset_id"] == "1234567890"
+
+
+def test_pending_task_instagram_personal_stays_on_instagram(client, seed_instagram_post):
+    r = client.post("/api/v1/accounts", json={
+        "persona_id": "p1",
+        "platform": "instagram",
+        "kind": "personal",
+        "page_url": "https://www.instagram.com/mathieu/",
+    })
+    assert r.status_code == 201
+    tasks = client.get("/api/v1/tasks/pending").json()["tasks"]
+    t = next(x for x in tasks if x["platform"] == "instagram")
+    assert t["publish_via"] == "instagram"
+    assert t["placements"] == []
+
+
+def test_pending_task_legacy_fallback_without_account(client):
+    # Persona sans Account mais avec l'ancien champ linkedin_page_url → fallback
+    _set_legacy_page_url(client, "p1", "https://www.linkedin.com/company/legacy/admin/")
+    t = client.get("/api/v1/tasks/pending").json()["tasks"][0]
+    assert t["page_url"] == "https://www.linkedin.com/company/legacy/admin/"
+    assert t["publish_as_name"] == "Noisyless"
+    assert t["publish_via"] == "linkedin"
 
 
 def test_pending_task_selectors_version_is_latest(client):

@@ -23,10 +23,30 @@ class Persona(Base):
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
+    # Deprecies — remplaces par la table accounts (conserves en lecture le temps
+    # d'une release, plus exposes en ecriture par l'API)
     linkedin_page_url = Column(String, nullable=True)
     instagram_page_url = Column(String, nullable=True)
 
     plannings = relationship("Planning", back_populates="persona", cascade="all, delete-orphan")
+    accounts = relationship("Account", back_populates="persona", cascade="all, delete-orphan")
+
+
+class Account(Base):
+    __tablename__ = "accounts"
+
+    id = Column(String, primary_key=True, default=gen_uuid)
+    persona_id = Column(String, ForeignKey("personas.id", ondelete="CASCADE"), nullable=False)
+    platform = Column(String, nullable=False)
+    kind = Column(String, default="personal", nullable=False)
+    page_url = Column(String, nullable=True)
+    identity_name = Column(String, nullable=True)
+    asset_id = Column(String, nullable=True)
+    enabled = Column(Integer, default=1, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    persona = relationship("Persona", back_populates="accounts")
 
 
 class Planning(Base):
@@ -61,11 +81,13 @@ class Post(Base):
     published_url = Column(String, nullable=True)
     error_code = Column(String, nullable=True)
     error_message = Column(Text, nullable=True)
+    account_id = Column(String, ForeignKey("accounts.id", ondelete="SET NULL"), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
     planning = relationship("Planning", back_populates="posts")
     persona = relationship("Persona")
+    account = relationship("Account")
     metrics = relationship("PostMetrics", back_populates="post", cascade="all, delete-orphan")
 
 

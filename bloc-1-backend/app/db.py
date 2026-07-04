@@ -20,7 +20,10 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
 def init_db() -> None:
+    from app.migrations import run_migrations
+
     Base.metadata.create_all(bind=engine)
+    run_migrations(engine)
     logger.info("DB tables created")
 
 

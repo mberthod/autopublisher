@@ -1,11 +1,20 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { api } from '$lib/api';
-  import type { Persona, BU } from '$lib/types';
+  import type { Persona, BU, Account, Platform, AccountKind } from '$lib/types';
 
   let personas: Persona[] = [];
+  let accounts: Account[] = [];
   let loading = true;
   let error = '';
+
+  const PLATFORMS: Platform[] = ['linkedin', 'instagram', 'facebook', 'tiktok'];
+  const KIND_LABELS: Record<AccountKind, string> = {
+    personal: 'Profil personnel',
+    company_page: 'Page entreprise',
+    business_account: 'Compte pro',
+  };
+  const PLATFORM_SHORT: Record<Platform, string> = { linkedin: 'in', instagram: 'ig', facebook: 'fb', tiktok: 'tk' };
 
   // Form state
   let showForm = false;
@@ -29,8 +38,6 @@
       mots_interdits: '',
       longueur_cible: 1500,
       emojis: '',
-      linkedin_page_url: '',
-      instagram_page_url: '',
     };
   }
 
@@ -42,11 +49,74 @@
     loading = true;
     error = '';
     try {
-      personas = await api.personas.list();
+      [personas, accounts] = await Promise.all([api.personas.list(), api.accounts.list()]);
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
     } finally {
       loading = false;
+    }
+  }
+
+  function accountsOf(personaId: string): Account[] {
+    return accounts.filter(a => a.persona_id === personaId);
+  }
+
+  // --- Comptes de publication ---
+  let accountFormFor: string | null = null;
+  let accountSaving = false;
+  let accountForm = defaultAccountForm();
+
+  function defaultAccountForm() {
+    return {
+      platform: 'linkedin' as Platform,
+      kind: 'company_page' as AccountKind,
+      identity_name: '',
+      page_url: '',
+      asset_id: '',
+    };
+  }
+
+  function startAddAccount(personaId: string) {
+    accountFormFor = personaId;
+    accountForm = defaultAccountForm();
+  }
+
+  async function saveAccount(personaId: string) {
+    accountSaving = true;
+    try {
+      const created = await api.accounts.create({
+        persona_id: personaId,
+        platform: accountForm.platform,
+        kind: accountForm.kind,
+        identity_name: accountForm.identity_name.trim() || null,
+        page_url: accountForm.page_url.trim() || null,
+        asset_id: accountForm.asset_id.trim() || null,
+      });
+      accounts = [...accounts, created];
+      accountFormFor = null;
+    } catch (e) {
+      error = e instanceof Error ? e.message : String(e);
+    } finally {
+      accountSaving = false;
+    }
+  }
+
+  async function toggleAccount(a: Account) {
+    try {
+      const updated = await api.accounts.update(a.id, { enabled: !a.enabled });
+      accounts = accounts.map(x => x.id === a.id ? updated : x);
+    } catch (e) {
+      error = e instanceof Error ? e.message : String(e);
+    }
+  }
+
+  async function deleteAccount(a: Account) {
+    if (!confirm(`Supprimer le compte ${a.identity_name || a.platform} ?`)) return;
+    try {
+      await api.accounts.delete(a.id);
+      accounts = accounts.filter(x => x.id !== a.id);
+    } catch (e) {
+      error = e instanceof Error ? e.message : String(e);
     }
   }
 
@@ -70,8 +140,6 @@
       mots_interdits: Array.isArray(cb.mots_interdits) ? (cb.mots_interdits as string[]).join(', ') : '',
       longueur_cible: (cb.longueur_cible as number) ?? 1500,
       emojis: Array.isArray(cb.emojis) ? (cb.emojis).join(' ') : '',
-      linkedin_page_url: p.linkedin_page_url ?? '',
-      instagram_page_url: p.instagram_page_url ?? '',
     };
     showForm = true;
     formError = '';
@@ -92,8 +160,6 @@
         longueur_cible: form.longueur_cible,
         emojis: form.emojis.split(/\s+/).filter(Boolean),
       },
-      linkedin_page_url: form.linkedin_page_url.trim() || null,
-      instagram_page_url: form.instagram_page_url.trim() || null,
     };
     try {
       if (editingId) {
@@ -198,24 +264,48 @@
                   </div>
                 </div>
               </div>
-              <!-- Pages de publication -->
+              <!-- Comptes de publication -->
               <div class="pub-pages">
-                <div class="pub-page-row">
-                  <span class="pub-platform li">in</span>
-                  {#if p.linkedin_page_url}
-                    <a class="pub-url" href={p.linkedin_page_url} target="_blank" rel="noopener">{p.linkedin_page_url.replace('https://www.linkedin.com/company/', '').replace(/\/$/, '')}</a>
-                  {:else}
-                    <span class="pub-url muted">Profil personnel (aucune page configurée)</span>
-                  {/if}
+                <div class="pub-section-head">
+                  <span class="field-label">Comptes de publication</span>
+                  <button class="btn btn-secondary btn-sm" on:click={() => startAddAccount(p.id)}>+ Compte</button>
                 </div>
-                <div class="pub-page-row">
-                  <span class="pub-platform ig">ig</span>
-                  {#if p.instagram_page_url}
-                    <a class="pub-url" href={p.instagram_page_url} target="_blank" rel="noopener">{p.instagram_page_url.replace('https://www.instagram.com/', '').replace(/\/$/, '')}</a>
-                  {:else}
-                    <span class="pub-url muted">Compte principal (aucune page configurée)</span>
-                  {/if}
-                </div>
+                {#each accountsOf(p.id) as a (a.id)}
+                  <div class="pub-page-row" class:disabled={!a.enabled}>
+                    <span class="pub-platform {a.platform}">{PLATFORM_SHORT[a.platform]}</span>
+                    <span class="pub-kind">{KIND_LABELS[a.kind]}</span>
+                    <span class="pub-identity">{a.identity_name || '—'}</span>
+                    {#if a.page_url}
+                      <a class="pub-url" href={a.page_url} target="_blank" rel="noopener">{a.page_url.replace(/^https:\/\/(www\.)?/, '').replace(/\/$/, '')}</a>
+                    {/if}
+                    <span class="pub-row-actions">
+                      <button class="link-btn" on:click={() => toggleAccount(a)}>{a.enabled ? 'Désactiver' : 'Activer'}</button>
+                      <button class="link-btn danger" on:click={() => deleteAccount(a)}>Supprimer</button>
+                    </span>
+                  </div>
+                {:else}
+                  <div class="pub-page-row"><span class="pub-url muted">Aucun compte — publication sur le profil connecté, sans vérification d'identité.</span></div>
+                {/each}
+
+                {#if accountFormFor === p.id}
+                  <div class="account-form">
+                    <select bind:value={accountForm.platform}>
+                      {#each PLATFORMS as pf}<option value={pf}>{pf}</option>{/each}
+                    </select>
+                    <select bind:value={accountForm.kind}>
+                      {#each Object.entries(KIND_LABELS) as [k, label]}<option value={k}>{label}</option>{/each}
+                    </select>
+                    <input bind:value={accountForm.identity_name} placeholder="Nom exact affiché (ex: Noisyless)" />
+                    <input bind:value={accountForm.page_url} placeholder="URL page (ex: https://www.linkedin.com/company/noisyless/admin/)" />
+                    <input bind:value={accountForm.asset_id} placeholder="Asset ID Meta Business Suite (optionnel)" />
+                    <div class="account-form-actions">
+                      <button class="btn btn-secondary btn-sm" on:click={() => accountFormFor = null}>Annuler</button>
+                      <button class="btn btn-primary btn-sm" on:click={() => saveAccount(p.id)} disabled={accountSaving}>
+                        {accountSaving ? '…' : 'Ajouter'}
+                      </button>
+                    </div>
+                  </div>
+                {/if}
               </div>
               <div class="meta">Créé le {new Date(p.created_at).toLocaleDateString('fr-FR')}</div>
             </div>
@@ -293,19 +383,9 @@
         </label>
 
         <div class="form-field span-2 section-sep">
-          <span class="section-label">Pages de publication</span>
-          <p class="section-hint">URL de la page entreprise LinkedIn/Instagram admin où publier. Laisser vide = profil personnel.</p>
+          <span class="section-label">Comptes de publication</span>
+          <p class="section-hint">Les pages entreprise et comptes pro se gèrent dans la carte du persona (section « Comptes de publication »).</p>
         </div>
-
-        <label class="form-field">
-          <span>Page LinkedIn <span class="platform-badge li">in</span></span>
-          <input bind:value={form.linkedin_page_url} placeholder="https://www.linkedin.com/company/noisyless/admin/" />
-        </label>
-
-        <label class="form-field">
-          <span>Page Instagram <span class="platform-badge ig">ig</span></span>
-          <input bind:value={form.instagram_page_url} placeholder="https://www.instagram.com/noisyless/" />
-        </label>
       </div>
 
       <div class="modal-footer">
@@ -373,11 +453,29 @@
     align-items: center; justify-content: center; font-size: 9px;
     font-weight: 800; color: #fff; flex-shrink: 0; text-transform: uppercase;
   }
-  .pub-platform.li { background: #0077B5; }
-  .pub-platform.ig { background: linear-gradient(135deg, #f09433, #dc2743, #bc1888); }
+  .pub-platform.linkedin { background: #0077B5; }
+  .pub-platform.instagram { background: linear-gradient(135deg, #f09433, #dc2743, #bc1888); }
+  .pub-platform.facebook { background: #1877F2; }
+  .pub-platform.tiktok { background: #111; }
   .pub-url { color: #6C63FF; text-decoration: none; font-weight: 500; }
   .pub-url:hover { text-decoration: underline; }
   .pub-url.muted { color: #9CA3AF; font-style: italic; }
+  .pub-section-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+  .pub-page-row.disabled { opacity: 0.45; }
+  .pub-kind { font-size: 11px; color: #6B7280; background: #F3F4F6; padding: 1px 7px; border-radius: 4px; flex-shrink: 0; }
+  .pub-identity { font-weight: 600; color: #374151; flex-shrink: 0; }
+  .pub-row-actions { margin-left: auto; display: flex; gap: 10px; }
+  .link-btn { background: none; border: none; color: #6C63FF; font-size: 11px; cursor: pointer; padding: 0; }
+  .link-btn.danger { color: #B91C1C; }
+  .link-btn:hover { text-decoration: underline; }
+  .account-form {
+    margin-top: 8px; padding: 10px; border: 1px dashed #D1D5DB; border-radius: 8px;
+    display: flex; flex-direction: column; gap: 6px;
+  }
+  .account-form input, .account-form select {
+    border: 1px solid #D1D5DB; border-radius: 6px; padding: 6px 8px; font-size: 12px; font-family: inherit;
+  }
+  .account-form-actions { display: flex; justify-content: flex-end; gap: 8px; }
 
   /* Form section separator */
   .section-sep { margin-top: 4px; }

@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.api.selector_routes import LATEST_VERSION
 from app.db import get_db
-from app.models import Post
+from app.models import Account, Post
 from app.services import post_service
 
 router = APIRouter()
@@ -24,6 +24,10 @@ class PendingTask(BaseModel):
     selectors_version: str = LATEST_VERSION
     page_url: Optional[str] = None
     publish_as_name: Optional[str] = None
+    publish_via: Optional[str] = None
+    account_kind: Optional[str] = None
+    asset_id: Optional[str] = None
+    placements: list[str] = []
 
 
 class TasksResponse(BaseModel):
@@ -59,17 +63,7 @@ def get_pending_tasks(db: Session = Depends(get_db)):
             media_urls.append(p.image_url)
         if p.carousel_urls:
             media_urls.extend(p.carousel_urls)
-        persona = p.persona
-        page_url = None
-        publish_as_name = None
-        BU_LABELS = {"noisyless": "Noisyless", "afluxo": "Afluxo", "mbhrep": "MBHREP"}
-        if persona:
-            if p.platform == "linkedin":
-                page_url = persona.linkedin_page_url
-                if page_url:  # n'imposer l'identite que si une page est configuree
-                    publish_as_name = BU_LABELS.get(persona.bu)
-            elif p.platform == "instagram":
-                page_url = persona.instagram_page_url
+        target = _resolve_target(db, p)
 
         tasks.append(PendingTask(
             task_id=p.id,
@@ -79,10 +73,65 @@ def get_pending_tasks(db: Session = Depends(get_db)):
             text=p.text,
             media_urls=media_urls,
             scheduled_for=p.scheduled_for.isoformat() if p.scheduled_for else None,
-            page_url=page_url,
-            publish_as_name=publish_as_name,
+            **target,
         ))
     return TasksResponse(tasks=tasks)
+
+
+# Labels historiques — uniquement pour le fallback des personas d'avant la table
+# accounts (les nouvelles cibles portent leur identity_name sur l'Account).
+_LEGACY_BU_LABELS = {"noisyless": "Noisyless", "afluxo": "Afluxo", "mbhrep": "MBHREP"}
+
+
+def _resolve_target(db: Session, post: Post) -> dict:
+    """Resout la cible de publication d'un post : Account explicite (post.account_id),
+    sinon premier Account actif du persona pour la plateforme, sinon fallback legacy
+    sur les anciens champs page_url du persona."""
+    account = post.account
+    if account is None:
+        account = (
+            db.query(Account)
+            .filter(Account.persona_id == post.persona_id)
+            .filter(Account.platform == post.platform)
+            .filter(Account.enabled == 1)
+            .order_by(Account.created_at)
+            .first()
+        )
+
+    if account:
+        publish_via = post.platform
+        placements: list[str] = []
+        if post.platform in ("instagram", "facebook") and account.kind != "personal":
+            publish_via = "meta_suite"
+            placements = [post.platform]
+        return {
+            "page_url": account.page_url,
+            "publish_as_name": account.identity_name,
+            "publish_via": publish_via,
+            "account_kind": account.kind,
+            "asset_id": account.asset_id,
+            "placements": placements,
+        }
+
+    # Fallback legacy (personas sans Account)
+    persona = post.persona
+    page_url = None
+    publish_as_name = None
+    if persona:
+        if post.platform == "linkedin":
+            page_url = persona.linkedin_page_url
+            if page_url:  # n'imposer l'identite que si une page est configuree
+                publish_as_name = _LEGACY_BU_LABELS.get(persona.bu)
+        elif post.platform == "instagram":
+            page_url = persona.instagram_page_url
+    return {
+        "page_url": page_url,
+        "publish_as_name": publish_as_name,
+        "publish_via": post.platform,
+        "account_kind": None,
+        "asset_id": None,
+        "placements": [],
+    }
 
 
 @router.post("/{task_id}/callback")

@@ -1,5 +1,5 @@
 import { PUBLIC_API_URL } from '$env/static/public';
-import type { Post, Persona, Planning } from './types';
+import type { Post, Persona, Planning, Account } from './types';
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${PUBLIC_API_URL}${path}`, options);
@@ -52,6 +52,29 @@ export const api = {
     },
     delete(id: string): Promise<void> {
       return request<void>(`/personas/${id}`, { method: 'DELETE' });
+    },
+  },
+  accounts: {
+    list(personaId?: string): Promise<Account[]> {
+      const q = personaId ? `?persona_id=${encodeURIComponent(personaId)}` : '';
+      return request<Account[]>(`/accounts${q}`);
+    },
+    create(data: Partial<Account> & { persona_id: string; platform: string }): Promise<Account> {
+      return request<Account>('/accounts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+    },
+    update(id: string, data: Partial<Account>): Promise<Account> {
+      return request<Account>(`/accounts/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+    },
+    delete(id: string): Promise<void> {
+      return request<void>(`/accounts/${id}`, { method: 'DELETE' });
     },
   },
   plannings: {

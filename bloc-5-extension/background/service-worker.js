@@ -5,9 +5,28 @@ import { enqueue, dequeue, markDone, markFailed, getStats } from "./task-queue.j
 const ALARM_POLL = "poll-tasks";
 const ALARM_SELECTORS = "refresh-selectors";
 const ALARM_ANALYTICS = "scrape-analytics";
-const PLATFORM_URLS = {
-  linkedin: "https://www.linkedin.com/feed/?shareActive=true&shareContentType=post",
-  instagram: "https://www.instagram.com/",
+
+// Registre des surfaces de publication. Une task est routee par
+// task.publish_via (calcule par le backend) avec fallback sur task.platform
+// pour les tasks anterieures encore en queue.
+const PLATFORM_REGISTRY = {
+  linkedin: {
+    url: (task) => task.page_url || "https://www.linkedin.com/feed/?shareActive=true&shareContentType=post",
+    selectorsKey: (task) => task.platform,
+    check: { urlPattern: "https://www.linkedin.com/*", loginRe: /\/(login|checkpoint|signup|uas)/, cookieUrl: "https://www.linkedin.com", cookieName: "li_at" },
+  },
+  instagram: {
+    url: (task) => task.page_url || "https://www.instagram.com/",
+    selectorsKey: (task) => task.platform,
+    check: { urlPattern: "https://www.instagram.com/*", loginRe: /\/accounts\/(login|signup)/, cookieUrl: "https://www.instagram.com", cookieName: "sessionid" },
+  },
+  meta_suite: {
+    url: (task) => task.asset_id
+      ? `https://business.facebook.com/latest/composer?asset_id=${encodeURIComponent(task.asset_id)}`
+      : "https://business.facebook.com/latest/home",
+    selectorsKey: () => "meta_suite",
+    check: { urlPattern: "https://business.facebook.com/*", loginRe: /\/(login|checkpoint)/, cookieUrl: "https://www.facebook.com", cookieName: "c_user" },
+  },
 };
 
 // Setup alarms on install/startup
@@ -45,21 +64,19 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     return true;
   }
   if (msg.type === "GET_CONNECTION_STATUS") {
-    Promise.all([
-      checkPlatformConnection("linkedin"),
-      checkPlatformConnection("instagram"),
-    ]).then(([linkedin, instagram]) => sendResponse({ linkedin, instagram }));
+    const keys = Object.keys(PLATFORM_REGISTRY);
+    Promise.all(keys.map((k) => checkPlatformConnection(k))).then((results) => {
+      const status = {};
+      keys.forEach((k, i) => { status[k] = results[i]; });
+      sendResponse(status);
+    });
     return true;
   }
 });
 
-const PLATFORM_CHECK = {
-  linkedin:  { urlPattern: "https://www.linkedin.com/*", loginRe: /\/(login|checkpoint|signup|uas)/, cookieUrl: "https://www.linkedin.com",  cookieName: "li_at" },
-  instagram: { urlPattern: "https://www.instagram.com/*", loginRe: /\/accounts\/(login|signup)/,    cookieUrl: "https://www.instagram.com", cookieName: "sessionid" },
-};
-
 async function checkPlatformConnection(platform) {
-  const cfg = PLATFORM_CHECK[platform];
+  const cfg = PLATFORM_REGISTRY[platform]?.check;
+  if (!cfg) return false;
   // Strategie 1 : verifier les onglets ouverts (pas de permission supplementaire)
   try {
     const tabs = await chrome.tabs.query({ url: cfg.urlPattern });
@@ -104,11 +121,13 @@ async function processNext() {
     return;
   }
 
-  const platformUrl = task.page_url || PLATFORM_URLS[task.platform];
-  if (!platformUrl) {
-    await failTask(task, "UNKNOWN", `Unknown platform: ${task.platform}`);
+  const route = task.publish_via || task.platform;
+  const platformCfg = PLATFORM_REGISTRY[route];
+  if (!platformCfg) {
+    await failTask(task, "UNKNOWN", `Unknown platform route: ${route}`);
     return;
   }
+  const platformUrl = platformCfg.url(task);
 
   // Pre-fetch media bytes in the service worker context to bypass
   // Private Network Access restrictions in content scripts.
@@ -137,7 +156,7 @@ async function processNext() {
     const result = await chrome.tabs.sendMessage(tab.id, {
       type: "PUBLISH_POST",
       task: { ...task, media_data: mediaData },
-      selectors: selectors.platforms[task.platform],
+      selectors: selectors.platforms[platformCfg.selectorsKey(task)],
     });
 
     if (result?.status === "success") {

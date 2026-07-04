@@ -27,44 +27,40 @@
         "https://www.linkedin.com/*"
       ],
       "js": [
-        "content/linkedin-publisher.js"
+        "dist/content/linkedin-publisher.js"
       ],
       "run_at": "document_idle",
-      "all_frames": false,
-      "type": "module"
+      "all_frames": false
     },
     {
       "matches": [
         "https://www.instagram.com/*"
       ],
       "js": [
-        "content/instagram-publisher.js"
+        "dist/content/instagram-publisher.js"
       ],
       "run_at": "document_idle",
-      "all_frames": false,
-      "type": "module"
+      "all_frames": false
     },
     {
       "matches": [
         "https://www.linkedin.com/*"
       ],
       "js": [
-        "content/analytics-scraper.js"
+        "dist/content/analytics-scraper.js"
       ],
       "run_at": "document_idle",
-      "all_frames": false,
-      "type": "module"
+      "all_frames": false
     },
     {
       "matches": [
         "https://www.instagram.com/*"
       ],
       "js": [
-        "content/analytics-scraper.js"
+        "dist/content/analytics-scraper.js"
       ],
       "run_at": "document_idle",
-      "all_frames": false,
-      "type": "module"
+      "all_frames": false
     }
   ],
   "action": {

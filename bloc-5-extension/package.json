@@ -4,11 +4,14 @@
   "type": "module",
   "scripts": {
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "build": "node build.mjs",
+    "dev": "node build.mjs --watch"
   },
   "devDependencies": {
-    "vitest": "^1.6.0",
     "@vitest/coverage-v8": "^1.6.0",
-    "jsdom": "^24.1.0"
+    "esbuild": "^0.28.1",
+    "jsdom": "^24.1.0",
+    "vitest": "^1.6.0"
   }
 }

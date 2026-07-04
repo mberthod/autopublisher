@@ -16,3 +16,6 @@
 **/data/carousels/*
 **/node_modules/
 CLAUDE_INSTRUCTIONS.md
+
+# Garder les bundles de lextension Chrome (pas de CI/build step)
+!bloc-5-extension/dist/

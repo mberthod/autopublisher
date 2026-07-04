@@ -16,6 +16,12 @@ start_bloc() {
   cd "$SCRIPT_DIR"
 }
 
+# Build extension content scripts
+echo "Building extension content scripts..."
+cd "$SCRIPT_DIR/bloc-5-extension" && node build.mjs
+cd "$SCRIPT_DIR"
+echo "Extension build done."
+
 # Kill any existing instances
 pkill -f "uvicorn app.main:app.*8000" 2>/dev/null || true
 pkill -f "uvicorn app.main:app.*8001" 2>/dev/null || true

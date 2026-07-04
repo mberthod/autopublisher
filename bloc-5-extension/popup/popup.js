@@ -137,7 +137,7 @@ $("btn-poll").addEventListener("click", async () => {
     await loadStats();
   } finally {
     $("btn-poll").disabled    = false;
-    $("btn-poll").textContent = "🔄 Rafraîchir la session";
+    $("btn-poll").textContent = "▶ Publier maintenant";
   }
 });
 

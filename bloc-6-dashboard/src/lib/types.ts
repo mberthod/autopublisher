@@ -11,6 +11,8 @@ export interface Persona {
   frustrations: string;
   cible: string;
   charte_branding: Record<string, unknown>;
+  linkedin_page_url?: string;
+  instagram_page_url?: string;
   created_at: string;
   updated_at: string;
 }

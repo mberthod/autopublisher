@@ -12,6 +12,8 @@ class PersonaCreate(BaseModel):
     frustrations: str = Field(..., min_length=10)
     cible: str = Field(..., min_length=10)
     charte_branding: dict
+    linkedin_page_url: Optional[str] = None
+    instagram_page_url: Optional[str] = None
 
 
 class PersonaUpdate(BaseModel):
@@ -21,6 +23,8 @@ class PersonaUpdate(BaseModel):
     frustrations: Optional[str] = None
     cible: Optional[str] = None
     charte_branding: Optional[dict] = None
+    linkedin_page_url: Optional[str] = None
+    instagram_page_url: Optional[str] = None
 
 
 class PersonaRead(BaseModel):
@@ -33,6 +37,8 @@ class PersonaRead(BaseModel):
     frustrations: str
     cible: str
     charte_branding: dict
+    linkedin_page_url: Optional[str] = None
+    instagram_page_url: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 

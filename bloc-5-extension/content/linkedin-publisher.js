@@ -22,9 +22,10 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
 });
 
 async function publishLinkedIn(task, sel) {
-  // Check we're logged in (feed present)
-  const feedCheck = document.querySelector("div.feed-identity-module, div[data-view-name='feed-index-container']");
-  if (!feedCheck) {
+  // Check we're logged in — works on personal feed AND company admin pages
+  const path = window.location.pathname;
+  const isLoginPage = /^\/(login|checkpoint|signup|uas|session-expired)/.test(path);
+  if (isLoginPage) {
     return { status: "failed", error_code: "AUTH_REQUIRED", error_message: "Not logged into LinkedIn" };
   }
 

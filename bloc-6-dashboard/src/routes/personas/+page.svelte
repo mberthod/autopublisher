@@ -29,6 +29,8 @@
       mots_interdits: '',
       longueur_cible: 1500,
       emojis: '',
+      linkedin_page_url: '',
+      instagram_page_url: '',
     };
   }
 
@@ -68,6 +70,8 @@
       mots_interdits: Array.isArray(cb.mots_interdits) ? (cb.mots_interdits as string[]).join(', ') : '',
       longueur_cible: (cb.longueur_cible as number) ?? 1500,
       emojis: Array.isArray(cb.emojis) ? (cb.emojis).join(' ') : '',
+      linkedin_page_url: p.linkedin_page_url ?? '',
+      instagram_page_url: p.instagram_page_url ?? '',
     };
     showForm = true;
     formError = '';
@@ -88,6 +92,8 @@
         longueur_cible: form.longueur_cible,
         emojis: form.emojis.split(/\s+/).filter(Boolean),
       },
+      linkedin_page_url: form.linkedin_page_url.trim() || null,
+      instagram_page_url: form.instagram_page_url.trim() || null,
     };
     try {
       if (editingId) {
@@ -192,6 +198,25 @@
                   </div>
                 </div>
               </div>
+              <!-- Pages de publication -->
+              <div class="pub-pages">
+                <div class="pub-page-row">
+                  <span class="pub-platform li">in</span>
+                  {#if p.linkedin_page_url}
+                    <a class="pub-url" href={p.linkedin_page_url} target="_blank" rel="noopener">{p.linkedin_page_url.replace('https://www.linkedin.com/company/', '').replace(/\/$/, '')}</a>
+                  {:else}
+                    <span class="pub-url muted">Profil personnel (aucune page configurée)</span>
+                  {/if}
+                </div>
+                <div class="pub-page-row">
+                  <span class="pub-platform ig">ig</span>
+                  {#if p.instagram_page_url}
+                    <a class="pub-url" href={p.instagram_page_url} target="_blank" rel="noopener">{p.instagram_page_url.replace('https://www.instagram.com/', '').replace(/\/$/, '')}</a>
+                  {:else}
+                    <span class="pub-url muted">Compte principal (aucune page configurée)</span>
+                  {/if}
+                </div>
+              </div>
               <div class="meta">Créé le {new Date(p.created_at).toLocaleDateString('fr-FR')}</div>
             </div>
           {/if}
@@ -266,6 +291,21 @@
           <span>Emojis autorisés <small>(séparés par des espaces)</small></span>
           <input bind:value={form.emojis} placeholder="✅ 🔧 📊" />
         </label>
+
+        <div class="form-field span-2 section-sep">
+          <span class="section-label">Pages de publication</span>
+          <p class="section-hint">URL de la page entreprise LinkedIn/Instagram admin où publier. Laisser vide = profil personnel.</p>
+        </div>
+
+        <label class="form-field">
+          <span>Page LinkedIn <span class="platform-badge li">in</span></span>
+          <input bind:value={form.linkedin_page_url} placeholder="https://www.linkedin.com/company/noisyless/admin/" />
+        </label>
+
+        <label class="form-field">
+          <span>Page Instagram <span class="platform-badge ig">ig</span></span>
+          <input bind:value={form.instagram_page_url} placeholder="https://www.instagram.com/noisyless/" />
+        </label>
       </div>
 
       <div class="modal-footer">
@@ -323,7 +363,33 @@
   .charte-key { font-weight: 600; color: #6B7280; min-width: 100px; flex-shrink: 0; }
   .tags-row { display: flex; flex-wrap: wrap; gap: 4px; }
   .tag-bad { background: #FEE2E2; color: #B91C1C; padding: 1px 7px; border-radius: 4px; font-size: 11px; }
-  .meta { font-size: 11px; color: #D1D5DB; margin-top: 12px; }
+  .meta { font-size: 11px; color: #D1D5DB; margin-top: 8px; }
+
+  /* Pages de publication */
+  .pub-pages { margin-top: 14px; display: flex; flex-direction: column; gap: 6px; }
+  .pub-page-row { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+  .pub-platform {
+    width: 22px; height: 22px; border-radius: 4px; display: flex;
+    align-items: center; justify-content: center; font-size: 9px;
+    font-weight: 800; color: #fff; flex-shrink: 0; text-transform: uppercase;
+  }
+  .pub-platform.li { background: #0077B5; }
+  .pub-platform.ig { background: linear-gradient(135deg, #f09433, #dc2743, #bc1888); }
+  .pub-url { color: #6C63FF; text-decoration: none; font-weight: 500; }
+  .pub-url:hover { text-decoration: underline; }
+  .pub-url.muted { color: #9CA3AF; font-style: italic; }
+
+  /* Form section separator */
+  .section-sep { margin-top: 4px; }
+  .section-label { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #6C63FF; }
+  .section-hint { font-size: 11px; color: #9CA3AF; font-weight: 400; margin-top: 3px; }
+  .platform-badge {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 16px; height: 16px; border-radius: 3px; font-size: 8px;
+    font-weight: 800; color: #fff; vertical-align: middle; margin-left: 3px;
+  }
+  .platform-badge.li { background: #0077B5; }
+  .platform-badge.ig { background: linear-gradient(135deg, #f09433, #dc2743, #bc1888); }
 
   .bu-tag {
     padding: 2px 8px; border-radius: 4px;

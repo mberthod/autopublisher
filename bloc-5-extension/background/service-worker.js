@@ -104,7 +104,7 @@ async function processNext() {
     return;
   }
 
-  const platformUrl = PLATFORM_URLS[task.platform];
+  const platformUrl = task.page_url || PLATFORM_URLS[task.platform];
   if (!platformUrl) {
     await failTask(task, "UNKNOWN", `Unknown platform: ${task.platform}`);
     return;

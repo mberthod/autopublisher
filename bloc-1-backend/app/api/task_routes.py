@@ -21,6 +21,7 @@ class PendingTask(BaseModel):
     media_urls: list[str]
     scheduled_for: Optional[str]
     selectors_version: str = "2026-07-01-v1"
+    page_url: Optional[str] = None
 
 
 class TasksResponse(BaseModel):
@@ -56,6 +57,14 @@ def get_pending_tasks(db: Session = Depends(get_db)):
             media_urls.append(p.image_url)
         if p.carousel_urls:
             media_urls.extend(p.carousel_urls)
+        persona = p.persona
+        page_url = None
+        if persona:
+            if p.platform == "linkedin":
+                page_url = persona.linkedin_page_url
+            elif p.platform == "instagram":
+                page_url = persona.instagram_page_url
+
         tasks.append(PendingTask(
             task_id=p.id,
             post_id=p.id,
@@ -64,6 +73,7 @@ def get_pending_tasks(db: Session = Depends(get_db)):
             text=p.text,
             media_urls=media_urls,
             scheduled_for=p.scheduled_for.isoformat() if p.scheduled_for else None,
+            page_url=page_url,
         ))
     return TasksResponse(tasks=tasks)
 

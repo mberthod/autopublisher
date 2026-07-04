@@ -23,6 +23,9 @@ class Persona(Base):
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
+    linkedin_page_url = Column(String, nullable=True)
+    instagram_page_url = Column(String, nullable=True)
+
     plannings = relationship("Planning", back_populates="persona", cascade="all, delete-orphan")
 
 

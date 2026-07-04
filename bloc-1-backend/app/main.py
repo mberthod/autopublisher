@@ -6,7 +6,7 @@ from loguru import logger
 
 from app.api import health_routes, persona_routes, planning_routes, post_routes
 from app.api import account_routes, task_routes, selector_routes, stats_routes
-from app.api import session_routes
+from app.api import session_routes, positioning_routes
 from app.config import settings
 from app.db import init_db
 
@@ -47,6 +47,7 @@ app.include_router(planning_routes.router, prefix="/api/v1/plannings", tags=["pl
 app.include_router(post_routes.router, prefix="/api/v1/posts", tags=["posts"])
 app.include_router(account_routes.router, prefix="/api/v1/accounts", tags=["accounts"])
 app.include_router(session_routes.router, prefix="/api/v1/sessions", tags=["sessions"])
+app.include_router(positioning_routes.router, prefix="/api/v1/positioning", tags=["positioning"])
 app.include_router(task_routes.router, prefix="/api/v1/tasks", tags=["tasks"])
 app.include_router(selector_routes.router, prefix="/api/v1/selectors", tags=["selectors"])
 app.include_router(stats_routes.router, prefix="/api/v1/stats", tags=["stats"])

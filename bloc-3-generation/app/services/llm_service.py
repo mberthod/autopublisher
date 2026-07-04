@@ -4,9 +4,39 @@ from typing import Optional
 
 from loguru import logger
 from openai import OpenAI
+from sqlalchemy import text as sql_text
 
 from app.config import settings
 from app.models import Persona
+
+
+def load_positioning(bu: str) -> dict:
+    """Lit le positionnement éditable de la BU (table positionings, DB partagée)."""
+    try:
+        from app.db import engine
+        with engine.connect() as conn:
+            row = conn.execute(
+                sql_text("SELECT content, keywords FROM positionings WHERE bu = :bu"),
+                {"bu": bu},
+            ).first()
+            if row:
+                return {"content": (row[0] or "").strip(), "keywords": (row[1] or "").strip()}
+    except Exception as e:
+        logger.warning(f"positionnement indisponible pour {bu}: {e}")
+    return {"content": "", "keywords": ""}
+
+
+def _positioning_block(content: str) -> str:
+    if not content:
+        return ""
+    return (
+        "\n=== POSITIONNEMENT DE RÉFÉRENCE (source de vérité — appuie-toi dessus) ===\n"
+        f"{content}\n"
+        "=== FIN POSITIONNEMENT ===\n"
+        "Ancre chaque contenu dans ce positionnement : reste fidèle à la cible, à la douleur "
+        "concrète, à la différenciation et au ton. Cite des scénarios et chiffres réels. "
+        "Ne promets jamais ce qui figure dans l'anti-positionnement.\n"
+    )
 
 # ── Platform-specific prompts optimised for engagement ─────────────────────
 
@@ -16,7 +46,7 @@ Cible : {cible}
 Besoins : {besoins}
 Frustrations : {frustrations}
 Charte : ton={ton} | mots interdits={mots_interdits} | emojis={emojis}
-
+{positionnement}
 STRUCTURE OBLIGATOIRE (applique-la à la lettre) :
 
 LIGNE 1 — HOOK : 1 seule phrase courte (max 12 mots). Doit stopper le scroll.
@@ -48,7 +78,7 @@ INSTAGRAM_SYSTEM = """Tu es un expert en contenu Instagram pour {bu}.
 
 Cible : {cible}
 Charte : ton={ton} | emojis={emojis}
-
+{positionnement}
 Tu génères UNE caption Instagram + UN texte visuel (pour l'image).
 
 FORMAT DE RÉPONSE — JSON STRICT (rien d'autre) :
@@ -64,13 +94,15 @@ RÈGLES caption :
 - 6-10 hashtags ciblés (pas génériques comme #life)
 - Mots interdits à bannir : {mots_interdits}"""
 
-IDEAS_SYSTEM = """Tu es un stratège de contenu RSE expert pour {bu}.
+IDEAS_SYSTEM = """Tu es un stratège de contenu B2B expert pour {bu}.
 
 Cible : {cible}
 Besoins : {besoins}
 Frustrations : {frustrations}
-
-Génère des angles éditoriaux originaux, concrets et engageants.
+{positionnement}
+Génère des angles éditoriaux ORIGINAUX et pertinents, ancrés dans la douleur réelle
+de la cible et la différenciation du positionnement. Évite les banalités RSE génériques :
+chaque angle doit refléter un scénario concret, un chiffre, ou une objection du terrain.
 Réponds UNIQUEMENT avec ce JSON (rien d'autre, pas de markdown) :
 {{"ideas": [{{"angle": "titre accrocheur en 1 phrase percutante", "rationale": "pourquoi ça engage cette cible", "platform": "linkedin"}}]}}
 """
@@ -89,6 +121,7 @@ class LLMService:
         ton = charte.get("ton", "professionnel et direct")
         mots_interdits = ", ".join(charte.get("mots_interdits", []))
         emojis = " ".join(charte.get("emojis", charte.get("emojis_autorises", [])))
+        positionnement = _positioning_block(load_positioning(persona.bu)["content"])
 
         if platform == "instagram":
             system = INSTAGRAM_SYSTEM.format(
@@ -97,6 +130,7 @@ class LLMService:
                 ton=ton,
                 emojis=emojis or "aucun",
                 mots_interdits=mots_interdits or "aucun",
+                positionnement=positionnement,
             )
             user = f"Angle éditorial : {angle_editorial}\n\nGénère le visual + la caption Instagram."
         else:
@@ -108,6 +142,7 @@ class LLMService:
                 ton=ton,
                 mots_interdits=mots_interdits or "aucun",
                 emojis=emojis or "aucun",
+                positionnement=positionnement,
             )
             user = f"Écris un post LinkedIn sur cet angle éditorial : {angle_editorial}"
 
@@ -160,13 +195,17 @@ class LLMService:
         }
 
     def generate_ideas(self, persona: Persona, keywords: str, platform: str, n: int = 10) -> list[dict]:
+        pos = load_positioning(persona.bu)
         system = IDEAS_SYSTEM.format(
             bu=persona.bu,
             cible=persona.cible,
             besoins=persona.besoins,
             frustrations=persona.frustrations,
+            positionnement=_positioning_block(pos["content"]),
         )
         plat_str = "LinkedIn ET Instagram" if platform == "both" else platform
+        # Si l'utilisateur ne fournit pas de mots-clés, on s'appuie sur ceux du positionnement
+        keywords = (keywords or "").strip() or pos["keywords"] or persona.cible
         user = (
             f"Génère exactement {n} angles éditoriaux pour les mots-clés : {keywords}\n"
             f"Adapte pour : {plat_str}\n"

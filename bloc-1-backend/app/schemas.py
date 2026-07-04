@@ -79,6 +79,23 @@ class AccountRead(BaseModel):
     updated_at: datetime
 
 
+# --- Positionnement (par BU, éditable) ---
+
+class PositioningUpsert(BaseModel):
+    content: Optional[str] = None
+    keywords: Optional[str] = None
+
+
+class PositioningRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    bu: str
+    content: Optional[str] = None
+    keywords: Optional[str] = None
+    updated_at: datetime
+
+
 # --- Session (cookies navigateur pour publication serveur) ---
 
 class SessionUpsert(BaseModel):

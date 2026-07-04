@@ -91,6 +91,19 @@ class Post(Base):
     metrics = relationship("PostMetrics", back_populates="post", cascade="all, delete-orphan")
 
 
+class Positioning(Base):
+    """Positionnement stratégique par BU, éditable, injecté dans les prompts
+    de génération (idées + posts) pour produire du contenu pertinent."""
+    __tablename__ = "positionings"
+
+    id = Column(String, primary_key=True, default=gen_uuid)
+    bu = Column(String, nullable=False, unique=True)  # noisyless|afluxo|mbhrep
+    content = Column(Text, nullable=True)             # positionnement (cible, douleur, diff, ton…)
+    keywords = Column(Text, nullable=True)            # mots-clés / thèmes pour la génération d'idées
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+
 class Session(Base):
     """Session de navigateur (cookies) capturee par l'extension et rejouee
     cote serveur par le publisher Playwright. Une session active par plateforme."""

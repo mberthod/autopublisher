@@ -1,3 +1,5 @@
+import copy
+
 from fastapi import APIRouter, HTTPException
 
 router = APIRouter()
@@ -254,7 +256,22 @@ SELECTORS["2026-07-04-v5"] = {
     },
 }
 
-LATEST_VERSION = "2026-07-04-v5"
+# v6 : Instagram a remplace le <textarea> de legende par un <div contenteditable>.
+# On elargit caption_editor (et next/share restent gerees par texte cote publisher).
+SELECTORS["2026-07-04-v6"] = copy.deepcopy(SELECTORS["2026-07-04-v5"])
+SELECTORS["2026-07-04-v6"]["version"] = "2026-07-04-v6"
+SELECTORS["2026-07-04-v6"]["platforms"]["instagram"]["caption_editor"] = (
+    "div[aria-label='Écrire une légende…'][contenteditable='true'], "
+    "div[aria-label='Write a caption...'][contenteditable='true'], "
+    "div[aria-label*='légende'][contenteditable='true'], "
+    "div[aria-label*='caption'][contenteditable='true'], "
+    "div[role='textbox'][contenteditable='true'], "
+    "div[contenteditable='true'][data-lexical-editor='true'], "
+    "textarea[aria-label='Écrire une légende…'], "
+    "textarea[aria-label='Write a caption...']"
+)
+
+LATEST_VERSION = "2026-07-04-v6"
 
 
 @router.get("/latest")

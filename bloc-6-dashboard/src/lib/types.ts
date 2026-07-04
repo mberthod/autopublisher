@@ -61,6 +61,16 @@ export interface Post {
   updated_at: string;
 }
 
+export interface SessionStatus {
+  id: string;
+  platform: Platform;
+  user_agent: string | null;
+  valid: boolean;
+  last_error: string | null;
+  cookie_count: number;
+  updated_at: string;
+}
+
 export type PersonaMap = Record<string, Persona>;
 
 export const ERROR_LABELS: Record<string, string> = {

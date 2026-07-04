@@ -28,6 +28,17 @@ export async function postCallback(taskId, payload) {
   return res.json();
 }
 
+export async function postSession(platform, cookies, userAgent) {
+  const base = await getBackendUrl();
+  const res = await fetch(`${base}/api/v1/sessions`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ platform, cookies, user_agent: userAgent }),
+  });
+  if (!res.ok) throw new Error(`session: HTTP ${res.status}`);
+  return res.json();
+}
+
 export async function fetchSelectors(version) {
   const base = await getBackendUrl();
   const endpoint = version

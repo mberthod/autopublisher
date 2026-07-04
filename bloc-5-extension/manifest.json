@@ -12,10 +12,9 @@
     "cookies"
   ],
   "host_permissions": [
-    "https://www.linkedin.com/*",
-    "https://www.instagram.com/*",
-    "https://business.facebook.com/*",
-    "https://www.facebook.com/*",
+    "https://*.linkedin.com/*",
+    "https://*.instagram.com/*",
+    "https://*.facebook.com/*",
     "http://localhost:*/*",
     "http://192.168.0.176:*/*"
   ],

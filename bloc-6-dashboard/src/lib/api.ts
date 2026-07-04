@@ -1,5 +1,5 @@
 import { PUBLIC_API_URL } from '$env/static/public';
-import type { Post, Persona, Planning, Account } from './types';
+import type { Post, Persona, Planning, Account, SessionStatus } from './types';
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${PUBLIC_API_URL}${path}`, options);
@@ -75,6 +75,11 @@ export const api = {
     },
     delete(id: string): Promise<void> {
       return request<void>(`/accounts/${id}`, { method: 'DELETE' });
+    },
+  },
+  sessions: {
+    list(): Promise<SessionStatus[]> {
+      return request<SessionStatus[]>('/sessions');
     },
   },
   plannings: {

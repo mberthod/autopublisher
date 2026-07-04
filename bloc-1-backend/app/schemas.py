@@ -79,6 +79,32 @@ class AccountRead(BaseModel):
     updated_at: datetime
 
 
+# --- Session (cookies navigateur pour publication serveur) ---
+
+class SessionUpsert(BaseModel):
+    platform: Platform
+    cookies: list[dict]
+    user_agent: Optional[str] = None
+
+
+class SessionRead(BaseModel):
+    """Etat de session SANS exposer les cookies (pour dashboard/popup)."""
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    platform: str
+    user_agent: Optional[str] = None
+    valid: bool
+    last_error: Optional[str] = None
+    cookie_count: int = 0
+    updated_at: datetime
+
+
+class SessionWithCookies(SessionRead):
+    """Reservee au publisher serveur : inclut les cookies."""
+    cookies: list[dict]
+
+
 # --- Planning ---
 
 class PlanningCreate(BaseModel):

@@ -50,6 +50,30 @@ for (const [platform, url] of Object.entries(LOGIN_URLS)) {
   });
 }
 
+// ---------- Synchronisation de session (cookies → serveur) ----------
+
+$("btn-sync-session").addEventListener("click", async () => {
+  const btn = $("btn-sync-session");
+  const out = $("sync-result");
+  btn.disabled = true;
+  btn.textContent = "Synchronisation…";
+  try {
+    const resp = await chrome.runtime.sendMessage({ type: "SYNC_SESSIONS" });
+    const results = resp?.results || [];
+    const lines = results.map((r) =>
+      r.ok ? `✅ ${r.platform} (${r.count} cookies)` : `⚠️ ${r.platform} : ${r.error}`
+    );
+    out.innerHTML = lines.join("<br>");
+    out.classList.remove("hidden");
+  } catch (e) {
+    out.textContent = "Erreur : " + e.message;
+    out.classList.remove("hidden");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "🔄 Synchroniser mes sessions";
+  }
+});
+
 // ---------- Onglet actif ----------
 
 async function detectCurrentTab() {
@@ -113,7 +137,7 @@ $("btn-poll").addEventListener("click", async () => {
     await loadStats();
   } finally {
     $("btn-poll").disabled    = false;
-    $("btn-poll").textContent = "▶ Publier maintenant";
+    $("btn-poll").textContent = "🔄 Rafraîchir la session";
   }
 });
 

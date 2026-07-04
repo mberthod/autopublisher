@@ -1,10 +1,18 @@
-import { fetchPendingTasks, postCallback } from "./api-client.js";
+import { fetchPendingTasks, postCallback, postSession } from "./api-client.js";
 import { getSelectors } from "./remote-selectors.js";
 import { enqueue, dequeue, markDone, markFailed, getStats } from "./task-queue.js";
 
 const ALARM_POLL = "poll-tasks";
 const ALARM_SELECTORS = "refresh-selectors";
 const ALARM_ANALYTICS = "scrape-analytics";
+const ALARM_SESSION = "sync-session";
+
+// Domaines dont on capture les cookies pour rejouer la session cote serveur.
+const SESSION_DOMAINS = {
+  linkedin: "linkedin.com",
+  instagram: "instagram.com",
+  meta_suite: "facebook.com",
+};
 
 // Registre des surfaces de publication. Une task est routee par
 // task.publish_via (calcule par le backend) avec fallback sur task.platform
@@ -34,8 +42,12 @@ chrome.runtime.onInstalled.addListener(setup);
 chrome.runtime.onStartup.addListener(setup);
 
 function setup() {
-  chrome.alarms.create(ALARM_POLL, { periodInMinutes: 5 });
+  // La publication est desormais assuree cote serveur (bloc-9-publisher) : l'extension
+  // ne publie plus (pas d'alarme poll-tasks), elle ne fait que capturer la session.
   chrome.alarms.create(ALARM_SELECTORS, { periodInMinutes: 360 });
+  // Rafraichit la session cote serveur toutes les 30 min tant que le PC tourne
+  chrome.alarms.create(ALARM_SESSION, { periodInMinutes: 30 });
+  syncAllSessions();
   // Daily analytics scraping at 9:00 AM
   const now = new Date();
   const next9AM = new Date(now);
@@ -48,20 +60,47 @@ function setup() {
 }
 
 chrome.alarms.onAlarm.addListener(async (alarm) => {
-  if (alarm.name === ALARM_POLL) await pollAndProcess();
   if (alarm.name === ALARM_SELECTORS) await refreshSelectors();
   if (alarm.name === ALARM_ANALYTICS) await scrapeAnalyticsForPublishedPosts();
+  if (alarm.name === ALARM_SESSION) await syncAllSessions();
 });
+
+// Capture les cookies d'une plateforme et les remonte au serveur, qui pourra
+// rejouer la session via Playwright headless (publication PC eteint).
+async function syncSession(platform) {
+  const domain = SESSION_DOMAINS[platform];
+  if (!domain) return { platform, ok: false, error: "unknown platform" };
+  try {
+    const cookies = await chrome.cookies.getAll({ domain });
+    if (!cookies.length) return { platform, ok: false, error: "no cookies (not logged in?)" };
+    await postSession(platform, cookies, navigator.userAgent);
+    return { platform, ok: true, count: cookies.length };
+  } catch (e) {
+    return { platform, ok: false, error: e.message };
+  }
+}
+
+async function syncAllSessions() {
+  const results = [];
+  for (const platform of Object.keys(SESSION_DOMAINS)) {
+    results.push(await syncSession(platform));
+  }
+  return results;
+}
 
 // Allow popup to trigger an immediate poll
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg.type === "FORCE_POLL") {
-    // Declenchement manuel : ignore le delai anti-spam de 4h
-    pollAndProcess({ manual: true }).then(() => sendResponse({ ok: true }));
+    // La publication est cote serveur : ce bouton resynchronise la session.
+    syncAllSessions().then(() => sendResponse({ ok: true }));
     return true; // keep channel open for async
   }
   if (msg.type === "GET_STATS") {
     getStats().then((s) => sendResponse(s));
+    return true;
+  }
+  if (msg.type === "SYNC_SESSIONS") {
+    syncAllSessions().then((results) => sendResponse({ results }));
     return true;
   }
   if (msg.type === "GET_CONNECTION_STATUS") {

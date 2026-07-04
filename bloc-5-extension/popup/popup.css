@@ -174,3 +174,27 @@ body {
 }
 
 .hidden { display: none !important; }
+
+.btn-sync {
+  width: 100%;
+  margin-top: 10px;
+  padding: 8px;
+  background: #6C63FF;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.btn-sync:hover:not(:disabled) { background: #5A52E0; }
+.btn-sync:disabled { opacity: 0.5; cursor: default; }
+.sync-result {
+  margin-top: 8px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: #374151;
+  background: #F3F4F6;
+  border-radius: 6px;
+  padding: 8px 10px;
+}

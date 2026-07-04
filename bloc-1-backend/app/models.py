@@ -91,6 +91,21 @@ class Post(Base):
     metrics = relationship("PostMetrics", back_populates="post", cascade="all, delete-orphan")
 
 
+class Session(Base):
+    """Session de navigateur (cookies) capturee par l'extension et rejouee
+    cote serveur par le publisher Playwright. Une session active par plateforme."""
+    __tablename__ = "sessions"
+
+    id = Column(String, primary_key=True, default=gen_uuid)
+    platform = Column(String, nullable=False, unique=True)  # linkedin|instagram|meta_suite
+    cookies = Column(JSON, nullable=False)                  # [{name,value,domain,path,secure,httpOnly,expirationDate,...}]
+    user_agent = Column(String, nullable=True)
+    valid = Column(Integer, default=1, nullable=False)
+    last_error = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+
 class PostMetrics(Base):
     __tablename__ = "post_metrics"
 

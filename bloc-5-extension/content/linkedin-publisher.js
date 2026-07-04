@@ -30,12 +30,36 @@ async function publishLinkedIn(task, sel) {
   }
 
   try {
-    // Click "Commencer un post"
-    const composeBtn = await waitForElement(sel.btn_open_compose, { timeoutMs: 10_000 });
-    await humanClick(composeBtn);
+    // Attendre que la page soit chargee (le feed doit etre visible)
+    await waitForElement("div[data-view-name='feed-index-container'], main, div.feed-container-theme", { timeoutMs: 15_000 });
+    await humanPause();
 
-    // Wait for text editor
-    const editor = await waitForElement(sel.text_editor, { timeoutMs: 10_000 });
+    // Le parametre ?shareActive=true peut avoir deja ouvert le compositeur.
+    // Sinon on cherche et clique le bouton compose.
+    let editor = document.querySelector("div[role='textbox'][contenteditable='true'], div.ql-editor[contenteditable='true']");
+
+    if (!editor) {
+      // Chercher le bouton d'ouverture du compositeur avec fallbacks larges
+      const composeSels = [
+        sel.btn_open_compose,
+        "button[aria-label*='post' i]",
+        "button[aria-label*='Commencer' i]",
+        "button[aria-label*='Start' i]",
+        ".share-box-feed-entry__trigger",
+        "div.share-box-feed-entry__top-bar button",
+        "div[class*='share-box'] button",
+        "div[class*='trigger'] button",
+      ].filter(Boolean).join(", ");
+
+      const composeBtn = await waitForElement(composeSels, { timeoutMs: 10_000 });
+      await humanClick(composeBtn);
+
+      editor = await waitForElement(
+        "div[role='textbox'][contenteditable='true'], div.ql-editor[contenteditable='true']",
+        { timeoutMs: 10_000 }
+      );
+    }
+
     await humanClick(editor);
     if (task.text) await typeText(editor, task.text);
 

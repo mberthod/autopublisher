@@ -6,7 +6,7 @@ const ALARM_POLL = "poll-tasks";
 const ALARM_SELECTORS = "refresh-selectors";
 const ALARM_ANALYTICS = "scrape-analytics";
 const PLATFORM_URLS = {
-  linkedin: "https://www.linkedin.com/feed/",
+  linkedin: "https://www.linkedin.com/feed/?shareActive=true&shareContentType=post",
   instagram: "https://www.instagram.com/",
 };
 

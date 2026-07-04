@@ -20,7 +20,7 @@ class PendingTask(BaseModel):
     text: Optional[str]
     media_urls: list[str]
     scheduled_for: Optional[str]
-    selectors_version: str = "2026-07-01-v1"
+    selectors_version: str = "2026-07-04-v3"
     page_url: Optional[str] = None
 
 

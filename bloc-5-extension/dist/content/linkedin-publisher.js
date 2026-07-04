@@ -106,9 +106,27 @@
       return { status: "failed", error_code: "AUTH_REQUIRED", error_message: "Not logged into LinkedIn" };
     }
     try {
-      const composeBtn = await waitForElement(sel.btn_open_compose, { timeoutMs: 1e4 });
-      await humanClick(composeBtn);
-      const editor = await waitForElement(sel.text_editor, { timeoutMs: 1e4 });
+      await waitForElement("div[data-view-name='feed-index-container'], main, div.feed-container-theme", { timeoutMs: 15e3 });
+      await humanPause();
+      let editor = document.querySelector("div[role='textbox'][contenteditable='true'], div.ql-editor[contenteditable='true']");
+      if (!editor) {
+        const composeSels = [
+          sel.btn_open_compose,
+          "button[aria-label*='post' i]",
+          "button[aria-label*='Commencer' i]",
+          "button[aria-label*='Start' i]",
+          ".share-box-feed-entry__trigger",
+          "div.share-box-feed-entry__top-bar button",
+          "div[class*='share-box'] button",
+          "div[class*='trigger'] button"
+        ].filter(Boolean).join(", ");
+        const composeBtn = await waitForElement(composeSels, { timeoutMs: 1e4 });
+        await humanClick(composeBtn);
+        editor = await waitForElement(
+          "div[role='textbox'][contenteditable='true'], div.ql-editor[contenteditable='true']",
+          { timeoutMs: 1e4 }
+        );
+      }
       await humanClick(editor);
       if (task.text) await typeText(editor, task.text);
       if (task.media_urls?.length > 0) {

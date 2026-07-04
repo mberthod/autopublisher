@@ -37,6 +37,7 @@ def generate(
         platform=req.platform,
         format=req.format,
     )
+    visual_headline = llm_result.get("visual_headline", "")
 
     post = Post(
         planning_id=req.planning_id,
@@ -58,6 +59,8 @@ def generate(
             post_id=post.id,
             angle_editorial=req.angle_editorial,
             charte=persona.charte_branding or {},
+            headline=visual_headline,
+            platform=req.platform,
         )
         if image_url:
             image_provider = "fal.ai"
@@ -82,7 +85,6 @@ def generate(
 
     logger.bind(post_id=post.id, format=req.format, ms=elapsed_ms).info("Post draft generated")
 
-    visual_headline = llm_result.get("visual_headline", "")
     return PostGenerateResponse(
         post_id=post.id,
         status=post.status,

@@ -9,10 +9,13 @@ const LOGIN_URLS = {
 
 // Demande au service-worker qui a acces aux tabs + cookies
 async function loadConnections() {
-  let status = {};
+  const fallback = { linkedin: false, instagram: false };
+  let status = fallback;
   try {
-    status = await chrome.runtime.sendMessage({ type: "GET_CONNECTION_STATUS" });
-  } catch { status = { linkedin: false, instagram: false }; }
+    const result = await chrome.runtime.sendMessage({ type: "GET_CONNECTION_STATUS" });
+    // sendMessage peut retourner null si le SW ne repond pas
+    if (result && typeof result === "object") status = result;
+  } catch {}
 
   for (const [platform, connected] of Object.entries(status)) {
     renderConnection(platform, connected);

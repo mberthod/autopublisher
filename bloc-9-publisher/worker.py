@@ -10,14 +10,15 @@ import sys
 import httpx
 from loguru import logger
 
-import linkedin
+import ig_publisher
 
 BACKEND = os.environ.get("BACKEND_URL", "http://192.168.0.176:8000")
 POLL_INTERVAL = int(os.environ.get("POLL_INTERVAL", "60"))
 API = f"{BACKEND}/api/v1"
 
-# Plateformes gérées côté serveur (instagram/meta_suite : étapes suivantes)
-PUBLISHERS = {"linkedin": linkedin.publish}
+# Instagram est publié côté serveur (instagrapi + sessionid). LinkedIn reste géré
+# par l'extension (API interne depuis le navigateur, session web valide seulement là).
+PUBLISHERS = {"instagram": ig_publisher.publish}
 
 _in_flight: set[str] = set()
 

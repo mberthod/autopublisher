@@ -139,7 +139,10 @@ async function refreshSelectors() {
 async function pollAndProcess({ manual = false } = {}) {
   try {
     const { tasks } = await fetchPendingTasks();
-    if (tasks.length > 0) await enqueue(tasks);
+    // L'extension ne publie que LinkedIn (session web valide dans ce navigateur).
+    // Instagram est publie cote serveur (worker instagrapi).
+    const mine = tasks.filter((t) => (t.publish_via || t.platform) === "linkedin");
+    if (mine.length > 0) await enqueue(mine);
   } catch (e) {
     console.warn("[SW] poll failed:", e.message);
   }

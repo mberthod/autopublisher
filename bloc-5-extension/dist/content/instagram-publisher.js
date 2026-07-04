@@ -122,12 +122,40 @@
       }
       await new Promise((r) => setTimeout(r, 400));
     }
-    const btn = await waitForElement(fallbackSel, { timeoutMs: 3e3 }).catch(() => null);
-    if (btn) {
-      await humanClick(btn);
-      return true;
+    if (fallbackSel) {
+      const btn = await waitForElement(fallbackSel, { timeoutMs: 3e3 }).catch(() => null);
+      if (btn) {
+        await humanClick(btn);
+        return true;
+      }
     }
     return false;
+  }
+  async function findFileInput(sel, timeoutMs = 15e3) {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      const input = document.querySelector(sel.file_input);
+      if (input) return input;
+      await clickButtonByText(["publication", "post"], null, 500).catch(() => {
+      });
+      await clickButtonByText(
+        ["s\xE9lectionner depuis l'ordinateur", "select from computer", "s\xE9lectionner sur l'ordinateur", "selectionner"],
+        null,
+        500
+      ).catch(() => {
+      });
+      await new Promise((r) => setTimeout(r, 500));
+    }
+    return null;
+  }
+  function domSnapshot() {
+    const btns = [...document.querySelectorAll("button, [role='button'], a, [role='menuitem'], input[type='file']")].filter((b) => b.offsetHeight > 0 || b.type === "file").slice(0, 18).map((b) => {
+      const t = (b.textContent || "").trim().slice(0, 24);
+      const al = b.getAttribute("aria-label") || "";
+      const tag = b.tagName.toLowerCase() + (b.type ? `[${b.type}]` : "");
+      return `${tag}"${t}"${al ? `(aria=${al.slice(0, 24)})` : ""}`;
+    });
+    return btns.join(" | ") || "aucun bouton visible";
   }
   async function publishInstagram(task, sel) {
     const navCheck = document.querySelector("nav, a[href='/']");
@@ -141,22 +169,26 @@
       const newPostBtn = await waitForElement(sel.btn_new_post, { timeoutMs: 1e4 });
       await humanClick(newPostBtn);
       await humanPause();
-      const fileInput = await waitForElement(sel.file_input, { timeoutMs: 1e4 });
+      const fileInput = await findFileInput(sel, 15e3);
+      if (!fileInput) {
+        return { status: "failed", error_code: "SELECTOR_NOT_FOUND", error_message: `Champ d'upload introuvable. DOM: ${domSnapshot()}` };
+      }
       await uploadMediaFromUrl(fileInput, task.media_urls[0], `post_${task.post_id}.png`, task.media_data?.[0] ?? null);
       await humanPause();
       for (let i = 0; i < 2; i++) {
         const ok = await clickButtonByText(["suivant", "next"], sel.next_button, 12e3);
-        if (!ok) return { status: "failed", error_code: "SELECTOR_NOT_FOUND", error_message: `Bouton 'Suivant' introuvable (etape ${i + 1})` };
+        if (!ok) return { status: "failed", error_code: "SELECTOR_NOT_FOUND", error_message: `Bouton 'Suivant' introuvable (etape ${i + 1}). DOM: ${domSnapshot()}` };
         await humanPause();
       }
       if (task.text) {
-        const caption = await waitForElement(sel.caption_editor, { timeoutMs: 1e4 });
+        const caption = await waitForElement(sel.caption_editor, { timeoutMs: 1e4 }).catch(() => null);
+        if (!caption) return { status: "failed", error_code: "SELECTOR_NOT_FOUND", error_message: `Champ legende introuvable. DOM: ${domSnapshot()}` };
         await humanClick(caption);
         await typeText(caption, task.text);
       }
       await humanPause();
       const shared = await clickButtonByText(["partager", "share"], sel.share_button, 12e3);
-      if (!shared) return { status: "failed", error_code: "SELECTOR_NOT_FOUND", error_message: "Bouton 'Partager' introuvable" };
+      if (!shared) return { status: "failed", error_code: "SELECTOR_NOT_FOUND", error_message: `Bouton 'Partager' introuvable. DOM: ${domSnapshot()}` };
       const confirmed = await waitForElement(sel.success_indicator, { timeoutMs: 3e4 }).catch(() => null);
       if (!confirmed) {
         return {

@@ -1,5 +1,5 @@
 import { PUBLIC_API_URL } from '$env/static/public';
-import type { Post, Persona, Planning, Account, SessionStatus } from './types';
+import type { Post, Persona, Planning, Account, SessionStatus, Positioning } from './types';
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${PUBLIC_API_URL}${path}`, options);
@@ -80,6 +80,18 @@ export const api = {
   sessions: {
     list(): Promise<SessionStatus[]> {
       return request<SessionStatus[]>('/sessions');
+    },
+  },
+  positioning: {
+    list(): Promise<Positioning[]> {
+      return request<Positioning[]>('/positioning');
+    },
+    update(bu: string, data: { content?: string; keywords?: string }): Promise<Positioning> {
+      return request<Positioning>(`/positioning/${bu}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
     },
   },
   plannings: {

@@ -61,6 +61,14 @@ export interface Post {
   updated_at: string;
 }
 
+export interface Positioning {
+  id: string;
+  bu: BU;
+  content: string | null;
+  keywords: string | null;
+  updated_at: string;
+}
+
 export interface SessionStatus {
   id: string;
   platform: Platform;

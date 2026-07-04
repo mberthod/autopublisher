@@ -14,6 +14,7 @@
     <a href="/analytics" class:active={$page.url.pathname === '/analytics'}>Analytics</a>
     <div class="divider"></div>
     <a href="/personas"  class:active={$page.url.pathname.startsWith('/personas')}>Personas</a>
+    <a href="/positionnement" class:active={$page.url.pathname === '/positionnement'}>Positionnement</a>
     <a href="/grillme"   class:active={$page.url.pathname === '/grillme'} class="grillme-link">GrilledMe</a>
   </div>
 </nav>

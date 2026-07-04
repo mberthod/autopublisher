@@ -1,163 +1,131 @@
-"""Publication LinkedIn côté serveur via Playwright headless.
+"""Publication LinkedIn via l'API interne "Voyager" (HTTP direct, comme Unipile).
 
-Rejoue la session de l'utilisateur (cookies capturés par l'extension) pour publier
-sur son profil ou une page entreprise, sans navigateur ouvert sur son PC.
+On ne pilote PAS un navigateur : on rejoue la session (cookie li_at + JSESSIONID
+qui sert de jeton csrf) et on appelle directement les endpoints internes que le
+site LinkedIn utilise. Rapide et sans DOM.
+
+Note : API non documentée + contraire aux CGU LinkedIn. Endpoints susceptibles de
+changer — on loggue les réponses en détail pour pouvoir ajuster.
 """
-import asyncio
-import unicodedata
 from typing import Optional
 
 import httpx
 from loguru import logger
-from playwright.async_api import async_playwright
 
-FEED_COMPOSE_URL = "https://www.linkedin.com/feed/?shareActive=true&shareContentType=post"
-LOGIN_RE = ("/login", "/checkpoint", "/authwall", "/uas/login", "/signup")
-
-OPEN_COMPOSE = [
-    "button[aria-label='Commencer un post']",
-    "button[aria-label='Start a post']",
-    "button.share-box-feed-entry__trigger",
-    "div.share-box-feed-entry__top-bar button",
-    "button:has-text('Commencer un post')",
-    "button:has-text('Start a post')",
-]
-EDITOR = "div[role='textbox'][contenteditable='true'], div.ql-editor[contenteditable='true']"
-ACTOR_NAME = ".share-creation-state__actor-name, button[class*='actor'] span, .share-box-feed-entry__closed-share-box"
-SUBMIT = [
-    "button.share-actions__primary-action",
-    "button[aria-label='Publier']",
-    "button[aria-label='Post']",
-    "button:has-text('Publier')",
-]
+VOYAGER = "https://www.linkedin.com/voyager/api"
+DEFAULT_UA = (
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) "
+    "Chrome/122.0.0.0 Safari/537.36"
+)
 
 
-def _norm(s: str) -> str:
-    return "".join(c for c in unicodedata.normalize("NFD", s or "") if unicodedata.category(c) != "Mn").lower().strip()
+def _cookies_by_name(cookies: list[dict]) -> dict:
+    return {c["name"]: c["value"] for c in cookies if c.get("name")}
 
 
-def _identity_matches(actual: str, expected: str) -> bool:
-    a, e = _norm(actual), _norm(expected)
-    return bool(a and e and (e in a or a in e))
+def _cookie_header(cookies: list[dict]) -> str:
+    return "; ".join(f'{c["name"]}={c["value"]}' for c in cookies if c.get("name"))
 
 
-async def _download(url: str, path: str) -> bool:
-    try:
-        async with httpx.AsyncClient(timeout=30) as cli:
-            r = await cli.get(url)
-            r.raise_for_status()
-            with open(path, "wb") as f:
-                f.write(r.content)
-        return True
-    except Exception as e:
-        logger.warning(f"media download failed: {e}")
-        return False
+def _headers(cookies: list[dict], user_agent: Optional[str]) -> Optional[dict]:
+    by_name = _cookies_by_name(cookies)
+    if "li_at" not in by_name:
+        return None
+    # csrf-token = valeur de JSESSIONID sans les guillemets
+    jsession = by_name.get("JSESSIONID", "").strip('"')
+    if not jsession:
+        return None
+    return {
+        "cookie": _cookie_header(cookies),
+        "csrf-token": jsession,
+        "x-restli-protocol-version": "2.0.0",
+        "accept": "application/vnd.linkedin.normalized+json+2.1",
+        "content-type": "application/json; charset=UTF-8",
+        "user-agent": user_agent or DEFAULT_UA,
+        "x-li-lang": "fr_FR",
+        "origin": "https://www.linkedin.com",
+        "referer": "https://www.linkedin.com/feed/",
+    }
+
+
+def _org_urn_from_page_url(page_url: Optional[str]) -> Optional[str]:
+    """Extrait l'URN d'organisation d'une URL de page admin, ex.
+    https://www.linkedin.com/company/115871126/admin/... -> urn:li:organization:115871126"""
+    if not page_url or "/company/" not in page_url:
+        return None
+    tail = page_url.split("/company/", 1)[1].strip("/")
+    ident = tail.split("/")[0].split("?")[0]
+    return f"urn:li:organization:{ident}" if ident.isdigit() else None
 
 
 async def publish(task: dict, cookies: list[dict], user_agent: Optional[str]) -> dict:
-    """Retourne {status: success|failed, post_url?, error_code?, error_message?}."""
-    from cookies import to_playwright
-
-    page_url = task.get("page_url") or FEED_COMPOSE_URL
     text = task.get("text") or ""
-    media_urls = task.get("media_urls") or []
-    publish_as = task.get("publish_as_name")
+    page_url = task.get("page_url")
+    org_urn = _org_urn_from_page_url(page_url)
 
-    async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True, args=["--no-sandbox"])
+    headers = _headers(cookies, user_agent)
+    if headers is None:
+        return {"status": "failed", "error_code": "AUTH_REQUIRED",
+                "error_message": "Cookies li_at/JSESSIONID absents — resynchronise la session"}
+
+    # Payload de creation de post texte (endpoint interne normShares)
+    payload = {
+        "visibleToConnectionsOnly": False,
+        "externalAudienceProviders": [],
+        "commentaryV2": {"text": text, "attributes": []},
+        "origin": "FEED",
+        "allowedCommentersScope": "ALL",
+        "postState": "PUBLISHED",
+        "media": [],
+    }
+    # Publier en tant que page entreprise : attribuer le post a l'organisation
+    if org_urn:
+        payload["containerEntity"] = org_urn
+
+    url = f"{VOYAGER}/contentcreation/normShares"
+    async with httpx.AsyncClient(timeout=30, follow_redirects=False) as client:
         try:
-            context = await browser.new_context(
-                user_agent=user_agent or None,
-                viewport={"width": 1280, "height": 900},
-                locale="fr-FR",
-            )
-            await context.add_cookies(to_playwright(cookies))
-            page = await context.new_page()
-            await page.goto(page_url, wait_until="domcontentloaded", timeout=45_000)
-            await page.wait_for_timeout(3000)
-
-            if any(k in page.url for k in LOGIN_RE):
-                return {"status": "failed", "error_code": "AUTH_REQUIRED",
-                        "error_message": f"Session invalide (redirige vers {page.url})"}
-
-            # Ouvrir le compositeur
-            editor = await _open_composer(page)
-            if editor is None:
-                return {"status": "failed", "error_code": "SELECTOR_NOT_FOUND",
-                        "error_message": "Compositeur LinkedIn introuvable"}
-
-            # Vérifier l'identité de publication (page entreprise) avant de publier
-            if publish_as:
-                actual = await _read_actor(page)
-                if not _identity_matches(actual, publish_as):
-                    return {"status": "failed", "error_code": "WRONG_IDENTITY",
-                            "error_message": f"Compositeur en tant que '{actual or 'inconnu'}' au lieu de '{publish_as}'"}
-
-            # Saisir le texte
-            await editor.click()
-            await page.wait_for_timeout(500)
-            if text:
-                await editor.type(text, delay=15)
-
-            # Média
-            if media_urls:
-                path = f"/tmp/li_{task.get('post_id', 'x')}.png"
-                if await _download(media_urls[0], path):
-                    file_input = await page.query_selector("input[type='file']")
-                    if file_input:
-                        await file_input.set_input_files(path)
-                        await page.wait_for_timeout(4000)
-
-            # Publier
-            if not await _click_first(page, SUBMIT):
-                return {"status": "failed", "error_code": "SELECTOR_NOT_FOUND",
-                        "error_message": "Bouton Publier introuvable"}
-
-            # Confirmation (toast) + tentative de récupération de l'URL du post
-            post_url = None
-            try:
-                await page.wait_for_selector("div[role='alert'], div[class*='artdeco-toast']", timeout=30_000)
-                link = await page.query_selector("div[class*='artdeco-toast'] a[href*='/feed/update/'], div[role='alert'] a[href*='/feed/update/']")
-                if link:
-                    post_url = await link.get_attribute("href")
-            except Exception:
-                pass
-
-            return {"status": "success", "post_url": post_url}
+            r = await client.post(url, headers=headers, json=payload)
         except Exception as e:
-            return {"status": "failed", "error_code": "UNKNOWN", "error_message": str(e)}
-        finally:
-            await browser.close()
+            return {"status": "failed", "error_code": "UNKNOWN", "error_message": f"requete: {e}"}
 
+    # 401/403 → session invalide ; redirection login idem
+    if r.status_code in (401, 403) or (300 <= r.status_code < 400):
+        return {"status": "failed", "error_code": "AUTH_REQUIRED",
+                "error_message": f"HTTP {r.status_code} (session invalide ?)"}
 
-async def _open_composer(page):
-    # L'editeur est peut-etre deja la (URL ?shareActive=true)
-    ed = await page.query_selector(EDITOR)
-    if ed and await ed.is_visible():
-        return ed
-    await _click_first(page, OPEN_COMPOSE)
+    if r.status_code not in (200, 201):
+        # Loggue le detail pour ajuster l'endpoint/payload au besoin
+        body = r.text[:500]
+        logger.warning(f"normShares HTTP {r.status_code}: {body}")
+        return {"status": "failed", "error_code": "PUBLISH_REJECTED",
+                "error_message": f"HTTP {r.status_code}: {body[:200]}"}
+
+    # Succes : tenter d'extraire l'URN de l'activite pour construire l'URL du post
+    post_url = None
     try:
-        await page.wait_for_selector(EDITOR, timeout=12_000, state="visible")
-        return await page.query_selector(EDITOR)
+        data = r.json()
+        urn = _find_activity_urn(data)
+        if urn:
+            post_url = f"https://www.linkedin.com/feed/update/{urn}/"
     except Exception:
+        pass
+
+    logger.bind(as_org=bool(org_urn)).info("post publie via Voyager")
+    return {"status": "success", "post_url": post_url}
+
+
+def _find_activity_urn(data) -> Optional[str]:
+    """Cherche un urn:li:activity:... dans la reponse JSON."""
+    import json as _json
+    blob = _json.dumps(data)
+    marker = "urn:li:activity:"
+    i = blob.find(marker)
+    if i == -1:
         return None
-
-
-async def _read_actor(page) -> str:
-    el = await page.query_selector(ACTOR_NAME)
-    if el:
-        return (await el.inner_text()).strip()
-    return ""
-
-
-async def _click_first(page, selectors: list[str]) -> bool:
-    for sel in selectors:
-        try:
-            el = await page.query_selector(sel)
-            if el and await el.is_visible():
-                await el.click()
-                await page.wait_for_timeout(1500)
-                return True
-        except Exception:
-            continue
-    return False
+    j = i + len(marker)
+    digits = ""
+    while j < len(blob) and blob[j].isdigit():
+        digits += blob[j]
+        j += 1
+    return f"{marker}{digits}" if digits else None

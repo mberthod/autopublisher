@@ -7,6 +7,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     const text = await res.text().catch(() => '');
     throw new Error(`API ${path}: HTTP ${res.status} ${text}`);
   }
+  if (res.status === 204) return undefined as T;
   return res.json() as Promise<T>;
 }
 
@@ -86,6 +87,7 @@ async function grillmeRequest<T>(path: string, options?: RequestInit): Promise<T
     const text = await res.text().catch(() => '');
     throw new Error(`GrilledMe ${path}: HTTP ${res.status} ${text}`);
   }
+  if (res.status === 204) return undefined as T;
   return res.json() as Promise<T>;
 }
 
@@ -132,6 +134,7 @@ async function genRequest<T>(path: string, options?: RequestInit): Promise<T> {
     const text = await res.text().catch(() => '');
     throw new Error(`Generation ${path}: HTTP ${res.status} ${text}`);
   }
+  if (res.status === 204) return undefined as T;
   return res.json() as Promise<T>;
 }
 
@@ -187,3 +190,4 @@ export const generation = {
     });
   },
 };
+

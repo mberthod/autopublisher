@@ -13,7 +13,7 @@ class CarouselSlide(BaseModel):
 
 class CarouselSpec(BaseModel):
     bu: Literal["noisyless", "afluxo", "mbhrep"]
-    theme: Literal["modern", "minimal", "bold", "organic"] = "modern"
+    theme: Literal["modern", "minimal", "bold", "organic", "instagram"] = "modern"
     slides: list[CarouselSlide] = Field(..., min_length=1, max_length=10)
     width: int = 1080
     height: int = 1080

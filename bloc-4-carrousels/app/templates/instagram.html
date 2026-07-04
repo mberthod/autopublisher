@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    width: {{ width }}px;
+    height: {{ height }}px;
+    font-family: system-ui, -apple-system, sans-serif;
+    background: {{ slide.background_color }};
+    color: {{ slide.text_color }};
+    overflow: hidden;
+    position: relative;
+  }
+
+  /* Gradient overlay pour profondeur */
+  .gradient-overlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      160deg,
+      rgba(0,0,0,0.0) 0%,
+      rgba(0,0,0,0.25) 60%,
+      rgba(0,0,0,0.55) 100%
+    );
+  }
+
+  /* Grain texture subtil */
+  .noise {
+    position: absolute;
+    inset: 0;
+    opacity: 0.04;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-size: 256px;
+  }
+
+  /* Accent line top */
+  .accent-top {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 6px;
+    background: {{ slide.text_color }};
+    opacity: 0.6;
+  }
+
+  /* Main content — centered */
+  .content {
+    position: relative;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 90px 80px;
+    text-align: center;
+  }
+
+  /* Big quote mark */
+  .quote-mark {
+    font-size: 140px;
+    line-height: 0.6;
+    opacity: 0.12;
+    font-family: Georgia, serif;
+    margin-bottom: 32px;
+    color: {{ slide.text_color }};
+  }
+
+  /* Main headline */
+  .headline {
+    font-size: 88px;
+    font-weight: 900;
+    line-height: 1.0;
+    letter-spacing: -3px;
+    text-transform: uppercase;
+    word-break: break-word;
+    hyphens: auto;
+  }
+
+  /* Divider */
+  .divider {
+    width: 60px;
+    height: 3px;
+    background: {{ slide.text_color }};
+    opacity: 0.4;
+    margin: 48px auto;
+  }
+
+  /* Body text */
+  .body {
+    font-size: 28px;
+    font-weight: 400;
+    line-height: 1.55;
+    opacity: 0.75;
+    max-width: 780px;
+  }
+
+  /* BU branding — bottom */
+  .brand-bar {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 80px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 72px;
+    background: rgba(0,0,0,0.25);
+    backdrop-filter: blur(8px);
+  }
+  .brand-name {
+    font-size: 16px;
+    font-weight: 800;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    opacity: 0.7;
+    color: {{ slide.text_color }};
+  }
+  .brand-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: {{ slide.text_color }};
+    opacity: 0.4;
+  }
+</style>
+</head>
+<body>
+  <div class="gradient-overlay"></div>
+  <div class="noise"></div>
+  <div class="accent-top"></div>
+
+  <div class="content">
+    <div class="quote-mark">"</div>
+    {% if slide.title %}
+    <div class="headline">{{ slide.title }}</div>
+    {% endif %}
+    {% if slide.body %}
+    <div class="divider"></div>
+    <div class="body">{{ slide.body }}</div>
+    {% endif %}
+  </div>
+
+  <div class="brand-bar">
+    <span class="brand-name">{{ bu }}</span>
+    <div class="brand-dot"></div>
+    <span class="brand-name" style="opacity:0.3;">{{ slide.index + 1 }}/{{ total }}</span>
+  </div>
+</body>
+</html>

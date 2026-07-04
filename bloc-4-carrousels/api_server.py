@@ -31,9 +31,10 @@ app.add_middleware(
 
 class QuickImageRequest(BaseModel):
     bu: str = "noisyless"
-    theme: str = "modern"
+    theme: Optional[str] = None          # auto si None : instagram → "instagram", linkedin → "bold"
+    platform: str = "linkedin"
     title: Optional[str] = None
-    body: str
+    body: str = ""
     background_color: str = "#1A1A2E"
     text_color: str = "#E2E2F0"
 
@@ -42,14 +43,15 @@ class QuickImageRequest(BaseModel):
 async def generate_image(req: QuickImageRequest):
     req_id = str(uuid.uuid4())[:12]
     output_dir = f"./data/carousels/{req_id}"
+    theme = req.theme or ("instagram" if req.platform == "instagram" else "bold")
     spec = CarouselSpec(
         bu=req.bu,  # type: ignore[arg-type]
-        theme=req.theme,  # type: ignore[arg-type]
+        theme=theme,  # type: ignore[arg-type]
         slides=[
             CarouselSlide(
                 index=0,
                 title=req.title,
-                body=req.body[:400],
+                body=req.body[:350] if req.platform == "instagram" else req.body[:200],
                 background="solid",
                 background_color=req.background_color,
                 text_color=req.text_color,

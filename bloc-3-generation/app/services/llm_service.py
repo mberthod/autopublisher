@@ -8,37 +8,61 @@ from openai import OpenAI
 from app.config import settings
 from app.models import Persona
 
-PLATFORM_LENGTH = {
-    "linkedin": "1300 à 2000 caractères",
-    "instagram": "200 à 500 caractères",
-}
+# ── Platform-specific prompts optimised for engagement ─────────────────────
 
-SYSTEM_PROMPT_TEMPLATE = """Tu es un community manager RSE expert pour {bu}.
+LINKEDIN_SYSTEM = """Tu es un expert en personal branding LinkedIn pour {bu}.
 
-Tu écris pour cette cible : {cible}
+Cible : {cible}
+Besoins : {besoins}
+Frustrations : {frustrations}
+Charte : ton={ton} | mots interdits={mots_interdits} | emojis={emojis}
 
-Persona — besoins : {besoins}
-Persona — frustrations : {frustrations}
+STRUCTURE OBLIGATOIRE (applique-la à la lettre) :
 
-Charte éditoriale :
-- Ton : {ton}
-- Mots INTERDITS (ne jamais utiliser) : {mots_interdits}
-- Emojis autorisés : {emojis_autorises}
-- Structure des phrases : {structure_phrases}
+LIGNE 1 — HOOK : 1 seule phrase courte (max 12 mots). Doit stopper le scroll.
+  → Formats qui marchent : chiffre frappant · question rhétorique · affirmation contre-intuitive · "Voici ce que personne ne dit sur…"
 
-Règles strictes :
-1. N'utilise JAMAIS les mots interdits
-2. Utilise uniquement les emojis autorisés, avec parcimonie
-3. Le texte doit parler directement à la cible, pas d'elle
-4. Pas de hashtags génériques (#RSE #développementdurable)
-5. Termine par un appel à l'action concret et court"""
+[ligne vide]
 
-USER_PROMPT_TEMPLATE = """Écris un post {platform} sur cet angle éditorial : {angle_editorial}
+DÉVELOPPEMENT : 3 à 5 blocs courts séparés par des lignes vides.
+  → Chaque bloc = 2-3 lignes max, une seule idée, langage direct et concret.
+  → Utilise des listes à puces (•) ou numérotées si pertinent.
+  → Inclus un anecdote réelle ou un exemple concret.
 
-Longueur cible : {longueur} caractères.
-Format du post : {format}.
+[ligne vide]
 
-Retourne UNIQUEMENT le texte du post, sans explication ni commentaire."""
+ENSEIGNEMENT : 1-2 phrases qui résument la leçon clé.
+
+[ligne vide]
+
+CALL TO ACTION : 1 question ouverte très courte pour provoquer des commentaires.
+
+RÈGLES :
+- Longueur : 1 400 à 2 000 caractères (compte les espaces)
+- Jamais de hashtags
+- Emojis : 0 à 2 max, uniquement si dans la charte
+- Jamais de formules creuses ("Je suis ravi de partager", "N'hésitez pas")
+- Jamais de mot interdit : {mots_interdits}"""
+
+INSTAGRAM_SYSTEM = """Tu es un expert en contenu Instagram pour {bu}.
+
+Cible : {cible}
+Charte : ton={ton} | emojis={emojis}
+
+Tu génères UNE caption Instagram + UN texte visuel (pour l'image).
+
+FORMAT DE RÉPONSE — JSON STRICT (rien d'autre) :
+{{
+  "visual": "phrase courte et percutante pour l'image (max 8 mots, uppercase OK)",
+  "caption": "caption Instagram courte et punchy (100-250 chars, ton direct, 1 emoji max, CTA court)\\n\\n#hashtag1 #hashtag2 #hashtag3 #hashtag4 #hashtag5 #hashtag6 #hashtag7"
+}}
+
+RÈGLES caption :
+- Max 250 caractères hors hashtags
+- 1 seul emoji maximum, bien placé
+- CTA en 1 phrase courte ("Dis-moi en commentaire…", "Tu vis ça aussi ?")
+- 6-10 hashtags ciblés (pas génériques comme #life)
+- Mots interdits à bannir : {mots_interdits}"""
 
 IDEAS_SYSTEM = """Tu es un stratège de contenu RSE expert pour {bu}.
 
@@ -62,41 +86,74 @@ class LLMService:
 
     def generate_text(self, persona: Persona, angle_editorial: str, platform: str, format: str) -> dict:
         charte = persona.charte_branding or {}
-        system_prompt = SYSTEM_PROMPT_TEMPLATE.format(
-            bu=persona.bu,
-            cible=persona.cible,
-            besoins=persona.besoins,
-            frustrations=persona.frustrations,
-            ton=charte.get("ton", "professional"),
-            mots_interdits=", ".join(charte.get("mots_interdits", [])),
-            emojis_autorises=" ".join(charte.get("emojis_autorises", [])),
-            structure_phrases=charte.get("structure_phrases", "phrases courtes"),
-        )
-        user_prompt = USER_PROMPT_TEMPLATE.format(
-            platform=platform,
-            angle_editorial=angle_editorial,
-            longueur=PLATFORM_LENGTH.get(platform, "1000 à 1500"),
-            format=format,
-        )
+        ton = charte.get("ton", "professionnel et direct")
+        mots_interdits = ", ".join(charte.get("mots_interdits", []))
+        emojis = " ".join(charte.get("emojis", charte.get("emojis_autorises", [])))
+
+        if platform == "instagram":
+            system = INSTAGRAM_SYSTEM.format(
+                bu=persona.bu,
+                cible=persona.cible,
+                ton=ton,
+                emojis=emojis or "aucun",
+                mots_interdits=mots_interdits or "aucun",
+            )
+            user = f"Angle éditorial : {angle_editorial}\n\nGénère le visual + la caption Instagram."
+        else:
+            system = LINKEDIN_SYSTEM.format(
+                bu=persona.bu,
+                cible=persona.cible,
+                besoins=persona.besoins,
+                frustrations=persona.frustrations,
+                ton=ton,
+                mots_interdits=mots_interdits or "aucun",
+                emojis=emojis or "aucun",
+            )
+            user = f"Écris un post LinkedIn sur cet angle éditorial : {angle_editorial}"
 
         logger.bind(persona_id=persona.id, platform=platform).info("LLM text generation started")
 
         response = self._client.chat.completions.create(
             model=self.model,
             messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
+                {"role": "system", "content": system},
+                {"role": "user", "content": user},
             ],
-            temperature=0.8,
+            temperature=0.82,
         )
 
-        text = response.choices[0].message.content or ""
+        raw = response.choices[0].message.content or ""
         usage = response.usage
+
+        # Parse Instagram JSON response
+        visual_headline = ""
+        if platform == "instagram":
+            try:
+                data = json.loads(raw)
+                visual_headline = data.get("visual", "")
+                text = data.get("caption", raw)
+            except Exception:
+                m = re.search(r'\{[\s\S]*\}', raw)
+                if m:
+                    try:
+                        data = json.loads(m.group())
+                        visual_headline = data.get("visual", "")
+                        text = data.get("caption", raw)
+                    except Exception:
+                        text = raw
+                else:
+                    text = raw
+        else:
+            text = raw
+            # Extract hook (first non-empty line) as visual headline for LinkedIn
+            lines = [l.strip() for l in text.split('\n') if l.strip()]
+            visual_headline = lines[0][:90] if lines else angle_editorial[:90]
 
         logger.bind(persona_id=persona.id, chars=len(text)).info("LLM text generation done")
 
         return {
             "text": text.strip(),
+            "visual_headline": visual_headline,
             "tokens_in": usage.prompt_tokens if usage else 0,
             "tokens_out": usage.completion_tokens if usage else 0,
             "model": self.model,

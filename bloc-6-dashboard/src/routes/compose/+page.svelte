@@ -68,6 +68,11 @@
     mbhrep: { bg: '#7C3A00', text: '#FEF3C7' },
   };
   const PLAT_COLORS: Record<Platform, string> = { linkedin: '#2563EB', instagram: '#EA580C' };
+  const BU_THEMES: Record<string, { bg: string; text: string }> = {
+    noisyless: { bg: '#1A0A3D', text: '#D4CAFF' },
+    afluxo:    { bg: '#062318', text: '#A7F3D0' },
+    mbhrep:    { bg: '#3D1500', text: '#FED7AA' },
+  };
   const FORMAT_OPTS: { id: Format; label: string }[] = [
     { id: 'text_only', label: 'Texte' },
     { id: 'image', label: 'Image' },
@@ -219,27 +224,29 @@
         });
 
         let imageUrl = resp.image_url ?? '';
-        if (!imageUrl && format !== 'text_only') {
+        if (format !== 'text_only') {
           const persona = personas.find(p => p.id === personaId);
-          const buColors = BU_COLORS[persona?.bu ?? 'noisyless'];
+          const buTheme = BU_THEMES[persona?.bu ?? 'noisyless'];
+          const visualTitle = resp.visual_headline || idea.angle.slice(0, 80);
+          const bodySnippet = platform === 'instagram'
+            ? ''
+            : resp.text.split('\n').filter((l: string) => l.trim()).slice(0, 2).join(' ').slice(0, 200);
           try {
             const imgResp = await fetch(`${PUBLIC_CAROUSEL_URL}/api/v1/image/generate`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 bu: persona?.bu ?? 'noisyless',
-                theme: 'modern',
-                title: idea.angle.slice(0, 80),
-                body: resp.text.slice(0, 300),
-                background_color: buColors.bg,
-                text_color: buColors.text,
+                platform,
+                title: visualTitle,
+                body: bodySnippet,
+                background_color: buTheme.bg,
+                text_color: buTheme.text,
               }),
             });
             const imgData = await imgResp.json();
-            imageUrl = imgData.image_url ?? '';
-          } catch {
-            imageUrl = '';
-          }
+            imageUrl = imgData.image_url || imageUrl;
+          } catch { /* keep existing */ }
         }
 
         posts = posts.map(p => p.id === tempId ? {
@@ -286,25 +293,29 @@
         platform: p.platform,
       });
       let imageUrl = resp.image_url ?? '';
-      if (!imageUrl && format !== 'text_only') {
+      if (format !== 'text_only') {
         const persona = personas.find(pe => pe.id === personaId);
-        const buColors = BU_COLORS[persona?.bu ?? 'noisyless'];
+        const buTheme = BU_THEMES[persona?.bu ?? 'noisyless'];
+        const visualTitle = resp.visual_headline || idea?.angle.slice(0, 80) || '';
+        const bodySnippet = p.platform === 'instagram'
+          ? ''
+          : resp.text.split('\n').filter((l: string) => l.trim()).slice(0, 2).join(' ').slice(0, 200);
         try {
           const imgResp = await fetch(`${PUBLIC_CAROUSEL_URL}/api/v1/image/generate`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               bu: persona?.bu ?? 'noisyless',
-              theme: 'bold',
-              title: idea.angle.slice(0, 80),
-              body: resp.text.slice(0, 300),
-              background_color: buColors.bg,
-              text_color: buColors.text,
+              platform: p.platform,
+              title: visualTitle,
+              body: bodySnippet,
+              background_color: buTheme.bg,
+              text_color: buTheme.text,
             }),
           });
           const imgData = await imgResp.json();
-          imageUrl = imgData.image_url ?? '';
-        } catch { imageUrl = ''; }
+          imageUrl = imgData.image_url || imageUrl;
+        } catch { /* keep existing */ }
       }
       posts = posts.map(x => x.id === p.id ? { ...x, regenerating: false, text: resp.text, image_url: imageUrl, comment: '' } : x);
     } catch {

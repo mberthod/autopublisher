@@ -150,6 +150,7 @@ export interface GenerateResponse {
   platform: string;
   image_url?: string;
   carousel_urls?: string[];
+  visual_headline?: string;
   generation_metadata?: Record<string, unknown>;
 }
 

@@ -18,6 +18,7 @@ class PostGenerateResponse(BaseModel):
     text: str
     image_url: Optional[str] = None
     carousel_urls: Optional[list[str]] = None
+    visual_headline: Optional[str] = None
     generation_metadata: dict
 
 

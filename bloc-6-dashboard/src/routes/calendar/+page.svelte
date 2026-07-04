@@ -9,6 +9,12 @@
   let loading = true;
   let error = '';
   let selectedPost: Post | null = null;
+  let editing = false;
+  let editDate = '';
+  let editStatus = '';
+  let saving = false;
+  let deleting = false;
+  let saveError = '';
 
   const BUS = ['noisyless', 'afluxo', 'mbhrep'] as const;
   const BU_LABELS: Record<string, string> = { noisyless: 'Noisyless', afluxo: 'Afluxo', mbhrep: 'MBHREP' };
@@ -66,6 +72,47 @@
     const pf: Record<string, string> = { linkedin: 'L', instagram: 'I' };
     return `${f[format] ?? '?'}${pf[platform] ?? '?'}`;
   }
+
+  function openPost(p: Post) {
+    selectedPost = p;
+    editing = false;
+    saveError = '';
+    editDate = p.scheduled_for ? new Date(p.scheduled_for).toISOString().slice(0, 16) : '';
+    editStatus = p.status;
+  }
+
+  async function saveEdit() {
+    if (!selectedPost) return;
+    saving = true;
+    saveError = '';
+    try {
+      const updated = await api.posts.update(selectedPost.id, {
+        scheduled_for: editDate ? new Date(editDate).toISOString() : undefined,
+        status: editStatus as Post['status'],
+      });
+      posts = posts.map(p => p.id === updated.id ? updated : p);
+      selectedPost = updated;
+      editing = false;
+    } catch (e) {
+      saveError = e instanceof Error ? e.message : String(e);
+    } finally {
+      saving = false;
+    }
+  }
+
+  async function deletePost() {
+    if (!selectedPost) return;
+    if (!confirm('Supprimer cette publication ? Cette action est irréversible.')) return;
+    deleting = true;
+    try {
+      await api.posts.delete(selectedPost.id);
+      posts = posts.filter(p => p.id !== selectedPost!.id);
+      selectedPost = null;
+    } catch (e) {
+      saveError = e instanceof Error ? e.message : String(e);
+      deleting = false;
+    }
+  }
 </script>
 
 <svelte:head><title>Calendar — SaaS RSE</title></svelte:head>
@@ -102,7 +149,7 @@
                     <button
                       class="chip"
                       style="background: {statusColors[p.status]}22; border-color: {statusColors[p.status]}66; color: {statusColors[p.status]}"
-                      on:click={() => selectedPost = p}
+                      on:click={() => openPost(p)}
                       title={p.text?.slice(0, 100) ?? p.angle_editorial}
                     >
                       {filterText(p.platform, p.format)}
@@ -262,4 +309,112 @@
     font-size: 12px; color: #B91C1C;
     background: #FEE2E2; padding: 8px; border-radius: 5px; margin-top: 8px;
   }
+
+  .modal-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+  .status-pill {
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+  .status-draft     { background: #F3F4F6; color: #6B7280; }
+  .status-validated { background: #FEF3C7; color: #92400E; }
+  .status-scheduled { background: #DBEAFE; color: #1E40AF; }
+  .status-published { background: #DCFCE7; color: #15803D; }
+  .status-failed    { background: #FEE2E2; color: #B91C1C; }
+
+  .edit-form {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 14px;
+    background: #F9FAFB;
+    border-radius: 8px;
+    margin-bottom: 14px;
+  }
+  .edit-label {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #6B7280;
+  }
+  .edit-input {
+    border: 1px solid #D1D5DB;
+    border-radius: 6px;
+    padding: 7px 10px;
+    font-size: 13px;
+    font-family: inherit;
+    background: #fff;
+  }
+  .edit-input:focus {
+    outline: none;
+    border-color: #6C63FF;
+    box-shadow: 0 0 0 2px rgba(108,99,255,0.15);
+  }
+
+  .modal-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 14px;
+    border-top: 1px solid #F3F4F6;
+    padding-top: 14px;
+  }
+  .btn-edit {
+    padding: 7px 16px;
+    background: #F5F3FF;
+    border: 1px solid #DDD6FE;
+    border-radius: 6px;
+    color: #5B21B6;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .btn-edit:hover { background: #EDE9FE; }
+  .btn-save {
+    padding: 7px 16px;
+    background: #6C63FF;
+    border: none;
+    border-radius: 6px;
+    color: #fff;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .btn-save:disabled { opacity: 0.5; cursor: default; }
+  .btn-save:not(:disabled):hover { background: #5A52E8; }
+  .btn-cancel {
+    padding: 7px 14px;
+    background: #F9FAFB;
+    border: 1px solid #E5E7EB;
+    border-radius: 6px;
+    color: #6B7280;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .btn-cancel:hover { background: #F3F4F6; }
+  .btn-delete {
+    margin-left: auto;
+    padding: 7px 14px;
+    background: #FEF2F2;
+    border: 1px solid #FECACA;
+    border-radius: 6px;
+    color: #B91C1C;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .btn-delete:hover { background: #FEE2E2; }
+  .btn-delete:disabled { opacity: 0.5; cursor: default; }
+
 </style>

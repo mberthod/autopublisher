@@ -82,11 +82,13 @@ def generate(
 
     logger.bind(post_id=post.id, format=req.format, ms=elapsed_ms).info("Post draft generated")
 
+    visual_headline = llm_result.get("visual_headline", "")
     return PostGenerateResponse(
         post_id=post.id,
         status=post.status,
         text=post.text,
         image_url=post.image_url,
         carousel_urls=post.carousel_urls,
+        visual_headline=visual_headline,
         generation_metadata=metadata,
     )

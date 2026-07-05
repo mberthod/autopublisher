@@ -1,4 +1,4 @@
-import { fetchPendingTasks, postCallback, postSession } from "./api-client.js";
+import { fetchPendingTasks, postCallback, postSession, postCapture } from "./api-client.js";
 import { getSelectors } from "./remote-selectors.js";
 import { enqueue, dequeue, markDone, markFailed, getStats } from "./task-queue.js";
 
@@ -19,7 +19,14 @@ const SESSION_DOMAINS = {
 // pour les tasks anterieures encore en queue.
 const PLATFORM_REGISTRY = {
   linkedin: {
-    url: (task) => task.page_url || "https://www.linkedin.com/feed/?shareActive=true&shareContentType=post",
+    // Pour publier en tant que PAGE, ouvrir l'espace ADMIN (contexte + x-li-page-instance requis).
+    url: (task) => {
+      if (task.page_url && task.page_url.includes("/company/")) {
+        const id = task.page_url.split("/company/")[1].replace(/^\/+/, "").split("/")[0].split("?")[0];
+        if (/^\d+$/.test(id)) return `https://www.linkedin.com/company/${id}/admin/page-posts/published/`;
+      }
+      return task.page_url || "https://www.linkedin.com/feed/?shareActive=true&shareContentType=post";
+    },
     selectorsKey: (task) => task.platform,
     check: { urlPattern: "https://www.linkedin.com/*", loginRe: /\/(login|checkpoint|signup|uas)/, cookieUrl: "https://www.linkedin.com", cookieName: "li_at" },
   },
@@ -96,6 +103,11 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     getStats().then((s) => sendResponse(s));
     return true;
   }
+  if (msg.type === "LI_CAPTURE") {
+    const { type, ...payload } = msg;
+    postCapture(payload).catch(() => {});
+    return false;
+  }
   if (msg.type === "SYNC_SESSIONS") {
     syncAllSessions().then((results) => sendResponse({ results }));
     return true;
@@ -136,17 +148,10 @@ async function refreshSelectors() {
   }
 }
 
-async function pollAndProcess({ manual = false } = {}) {
-  try {
-    const { tasks } = await fetchPendingTasks();
-    // L'extension ne publie que LinkedIn (session web valide dans ce navigateur).
-    // Instagram est publie cote serveur (worker instagrapi).
-    const mine = tasks.filter((t) => (t.publish_via || t.platform) === "linkedin");
-    if (mine.length > 0) await enqueue(mine);
-  } catch (e) {
-    console.warn("[SW] poll failed:", e.message);
-  }
-  await processNext({ manual });
+async function pollAndProcess() {
+  // Publication entièrement côté serveur : Instagram (instagrapi) + LinkedIn (Unipile).
+  // L'extension ne publie plus ; elle ne sert qu'à capturer la session Instagram.
+  return;
 }
 
 async function processNext({ manual = false } = {}) {

@@ -11,14 +11,17 @@ import httpx
 from loguru import logger
 
 import ig_publisher
+import li_unipile
 
 BACKEND = os.environ.get("BACKEND_URL", "http://192.168.0.176:8000")
 POLL_INTERVAL = int(os.environ.get("POLL_INTERVAL", "60"))
 API = f"{BACKEND}/api/v1"
 
-# Instagram est publié côté serveur (instagrapi + sessionid). LinkedIn reste géré
-# par l'extension (API interne depuis le navigateur, session web valide seulement là).
+# Instagram : instagrapi + sessionid. LinkedIn : via Unipile si configuré (page
+# entreprise, PC éteint), sinon géré par l'extension.
 PUBLISHERS = {"instagram": ig_publisher.publish}
+if li_unipile.configured():
+    PUBLISHERS["linkedin"] = li_unipile.publish
 
 _in_flight: set[str] = set()
 

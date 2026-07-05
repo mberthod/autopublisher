@@ -46,7 +46,17 @@ curl -s -X POST http://localhost:8003/api/v1/posts/generate \
 ## Notes
 
 - **LLM** : Ollama `deepseek-v4-flash:cloud` via `http://localhost:11434/v1`
-- **Images** : FAL.ai `fal-ai/flux/schnell` — skippé si `FAL_KEY` vide
+- **Images** : FAL.ai `fal-ai/flux/dev` (negative prompt anti-texte) — skippé si `FAL_KEY` vide
 - **Stockage images** : `./data/posts/{post_id}.png` servi en static
 - **generation_metadata** : colonne ajoutée à la table `posts` au démarrage (ALTER TABLE idempotent)
 - **Carousel** : délegué au bloc 4 (provider=playwright, pas d'image générée ici)
+
+## Post-traitement image (overlay Pillow)
+
+Après génération FAL, `image_service` ajoute : dégradé sombre en bas + **hook** (visual_headline)
+blanc bold + barre accent orange + **logo Noisyless** (haut droite). Format IG carré / LinkedIn paysage.
+
+## Positionnement injecté
+
+`llm_service.load_positioning(bu)` injecte le positionnement éditable (table `Positioning`, éditée
+via le dashboard `/positionnement`) dans les 3 prompts (idées, LinkedIn, Instagram) via `{positionnement}`.

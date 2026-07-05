@@ -86,3 +86,19 @@ curl -s http://localhost:8000/api/v1/personas | python3 -m json.tool
 curl -s http://localhost:8000/healthz
 curl -s http://localhost:8000/readyz
 ```
+
+## Endpoints ajoutés (pivots serveur-side / positionnement)
+
+| Méthode | Endpoint | Description |
+|---------|----------|-------------|
+| POST/GET/DELETE | /api/v1/accounts | Comptes de publication par persona (personal / company_page / business_account) |
+| POST | /api/v1/sessions | Upsert session capturée (cookies, jamais loggés) |
+| GET | /api/v1/sessions/{platform}/cookies | Cookies pour le worker bloc-9 |
+| POST | /api/v1/sessions/{platform}/invalidate | Invalider une session |
+| GET/PATCH | /api/v1/positioning | Positionnement éditable par BU (injecté dans les prompts bloc-3) |
+| POST/GET | /api/v1/posts/{id}/metrics | Métriques de post (PostMetrics) |
+| GET | /api/v1/stats | Stats globales (published/scheduled/draft/failed, par plateforme) |
+| GET | /api/v1/tasks/pending | Posts scheduled dus (consommés par le worker bloc-9) |
+| POST | /api/v1/tasks/{id}/callback | Callback succès/échec de publication |
+
+Migrations SQLite idempotentes au démarrage (`app/migrations.py`, via `init_db`).

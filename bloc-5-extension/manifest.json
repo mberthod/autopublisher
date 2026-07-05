@@ -35,6 +35,16 @@
     },
     {
       "matches": [
+        "https://www.linkedin.com/*"
+      ],
+      "js": [
+        "content/li-capture-relay.js"
+      ],
+      "run_at": "document_start",
+      "all_frames": false
+    },
+    {
+      "matches": [
         "https://www.instagram.com/*"
       ],
       "js": [
@@ -85,7 +95,8 @@
   "web_accessible_resources": [
     {
       "resources": [
-        "offscreen/offscreen.html"
+        "offscreen/offscreen.html",
+        "content/li-capture.js"
       ],
       "matches": [
         "<all_urls>"

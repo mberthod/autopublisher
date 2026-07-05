@@ -39,6 +39,15 @@ export async function postSession(platform, cookies, userAgent) {
   return res.json();
 }
 
+export async function postCapture(data) {
+  const base = await getBackendUrl();
+  await fetch(`${base}/api/v1/debug/capture`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+}
+
 export async function fetchSelectors(version) {
   const base = await getBackendUrl();
   const endpoint = version
